@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../constants/app_config.dart';
+import 'vitals_extractor.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GeminiConversationService — True free dialogue, not a question form
@@ -23,22 +24,16 @@ class ConversationTurn {
 }
 
 class ConversationResponse {
-  /// Natural Bengali response to speak aloud — acknowledgement + guidance + next question
   final String spokenResponse;
-
-  /// Structured answers extracted from the full conversation so far
-  /// Maps engine question ID → bool (true = danger present)
   final Map<String, bool> extractedAnswers;
-
-  /// True when Gemini has enough info to conclude — triggers rule engine
+  final Map<String, double> extractedVitals; // NEW: BP, temp, MUAC, SpO2 etc.
   final bool shouldFinish;
-
-  /// Risk level Gemini detected: 'low', 'medium', 'high', 'emergency'
   final String riskLevel;
 
   const ConversationResponse({
     required this.spokenResponse,
     required this.extractedAnswers,
+    this.extractedVitals = const {},
     required this.shouldFinish,
     required this.riskLevel,
   });
@@ -219,13 +214,20 @@ ${_moduleContext(caseType)}
             .map((e) => '${questionDescs[e.key] ?? e.key}: ${e.value ? "আছে" : "নেই"}')
             .join(', ');
 
+    // Extract vitals from the new input before sending to Gemini
+    final spokenVitals = VitalsExtractor.extract(newInput);
+    final vitalsSummary = VitalsExtractor.summarise(spokenVitals);
+    final vitalsContext = vitalsSummary.isNotEmpty
+        ? '\nমাপা ভাইটাল সাইন: $vitalsSummary'
+        : '';
+
     final prompt = '''
 ${_systemPrompt(caseType, moduleId)}
 
 এখন পর্যন্ত কথোপকথন:
 $historyText
 
-ASHA এইমাত্র বললেন: "$newInput"
+ASHA এইমাত্র বললেন: "$newInput"$vitalsContext
 
 ইতিমধ্যে জানা তথ্য: $alreadyKnown
 
@@ -286,9 +288,17 @@ extracted_answers শুধু সেই প্রশ্নগুলো যা �
         if (e.value is bool) extracted[e.key] = e.value as bool;
       }
 
+      // Prepend vital danger alert to spoken response if needed
+      String spokenResponse = json['spoken_response'] as String? ?? newInput;
+      if (spokenVitals.isNotEmpty) {
+        final alert = VitalsExtractor.getDangerAlert(spokenVitals, moduleId);
+        if (alert != null) spokenResponse = '$alert $spokenResponse';
+      }
+
       return ConversationResponse(
-        spokenResponse: json['spoken_response'] as String? ?? newInput,
+        spokenResponse: spokenResponse,
         extractedAnswers: extracted,
+        extractedVitals: spokenVitals,
         shouldFinish: json['should_finish'] == true,
         riskLevel: json['risk_level'] as String? ?? 'low',
       );

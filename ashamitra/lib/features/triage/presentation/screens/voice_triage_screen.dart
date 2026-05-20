@@ -9,7 +9,6 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_gradients.dart';
 import '../../../../shared/widgets/voice_orb.dart';
 import '../../../../shared/widgets/mic_button.dart';
-import '../../../../shared/widgets/glass_card.dart';
 import '../../../../core/services/gemini_conversation_service.dart';
 import '../../../../core/services/rule_executor.dart';
 import '../../../../core/services/offline_brain.dart';
@@ -39,7 +38,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
   // ── Conversation state ────────────────────────────────────────
   final List<ConversationTurn> _history = [];
   final Map<String, bool> _extractedAnswers = {};
-  String _lastAssistantText = '';
+  final Map<String, double> _extractedVitals = {};
   String _riskLevel = 'low';
   int _turnCount = 0;
 
@@ -58,8 +57,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
 
   // ── Offline fallback questions ────────────────────────────────
   List<EngineQuestion> _offlineQuestions = [];
-  int _offlineIndex = 0;
-  bool _usingOfflineFallback = false;
+
 
   @override
   void initState() {
@@ -260,14 +258,13 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
               response.extractedAnswers.entries.where((e) => e.value == false))
           : response.extractedAnswers;
       _extractedAnswers.addAll(toMerge);
+      _extractedVitals.addAll(response.extractedVitals); // accumulate vitals
       final localRisk = _computeLocalRiskLevel();
       final geminiRisk = response.riskLevel;
       const riskOrder = ['low', 'medium', 'high', 'emergency'];
       _riskLevel = riskOrder.indexOf(localRisk) >= riskOrder.indexOf(geminiRisk)
           ? localRisk
           : geminiRisk;
-      _lastAssistantText = response.spokenResponse;
-
       // Add assistant turn to history
       _history.add(ConversationTurn(
           role: 'assistant', text: response.spokenResponse));
@@ -325,7 +322,6 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
           ConversationTurn(role: 'assistant', text: emergencyText));
       setState(() {
         _isProcessing = false;
-        _lastAssistantText = emergencyText;
         _orbState = OrbState.idle;
         _statusText = 'মাইক ট্যাপ করুন কথা বলতে';
         _transcript = '';
@@ -347,7 +343,6 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
           const ConversationTurn(role: 'assistant', text: emergencyText));
       setState(() {
         _isProcessing = false;
-        _lastAssistantText = emergencyText;
         _riskLevel = 'emergency';
         _orbState = OrbState.idle;
         _statusText = 'মাইক ট্যাপ করুন কথা বলতে';
@@ -368,7 +363,6 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
           .where((q) => q.moduleId == _moduleId)
           .where((q) => !_extractedAnswers.containsKey(q.id))
           .toList();
-      _offlineIndex = 0;
     }
 
     // Check immediate action for any confirmed danger signs
@@ -412,7 +406,6 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
           ? '$immediateAction $summary'
           : summary;
       _history.add(ConversationTurn(role: 'assistant', text: responseText));
-      _lastAssistantText = responseText;
       setState(() {
         _isProcessing = false;
         _orbState = OrbState.idle;
@@ -444,8 +437,6 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
         : '$ack ${nextQ.textBn}';
 
     _history.add(ConversationTurn(role: 'assistant', text: responseText));
-    _lastAssistantText = responseText;
-
     setState(() {
       _isProcessing = false;
       _orbState = OrbState.idle;
@@ -527,6 +518,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
       '_caseType': _caseType,
       '_situation': _history.isNotEmpty ? _history.first.text : '',
       '_qaList': qaPairs.join(';;'),
+      '_vitals': Map<String, dynamic>.from(_extractedVitals),
       ..._extractedAnswers,
     };
     Get.toNamed(AppRoutes.triageResult, arguments: args);

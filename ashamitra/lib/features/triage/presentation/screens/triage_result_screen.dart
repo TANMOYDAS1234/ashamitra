@@ -57,9 +57,15 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
               : e.value == 'না'  ? false
               : e.value,                         // anything else (String vitals etc.)
     };
+    final rawVitals = _args['_vitals'];
+    final vitalsMap = rawVitals is Map
+        ? Map<String, dynamic>.from(rawVitals)
+        : <String, dynamic>{};
+
     _engineResult = Get.find<RuleExecutor>().execute(
       moduleId: _moduleId,
       answers: rawAnswers,
+      vitals: vitalsMap,
     );
 
     // If pipeline blocked (validation failed), treat as GREEN with warning
