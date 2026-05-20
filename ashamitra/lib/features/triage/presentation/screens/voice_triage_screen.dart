@@ -39,6 +39,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
   final List<ConversationTurn> _history = [];
   final Map<String, bool> _extractedAnswers = {};
   final Map<String, double> _extractedVitals = {};
+  String _streamingPartial = ''; // live text from SSE stream
   String _riskLevel = 'low';
   int _turnCount = 0;
 
@@ -245,12 +246,16 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
       final response = await _conversationService.respond(
         caseType: _caseType,
         moduleId: _moduleId,
-        history: List.from(_history)..removeLast(), // exclude current turn
+        history: List.from(_history)..removeLast(),
         newInput: input,
         currentAnswers: Map.from(_extractedAnswers),
+        onPartialResponse: (partial) {
+          if (mounted) setState(() => _streamingPartial = partial);
+        },
       );
 
       if (!mounted) return;
+      setState(() => _streamingPartial = '');
 
       // Gap 5: if uncertain, only accept false (no danger) extractions
       final toMerge = uncertain
@@ -806,6 +811,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           CircleAvatar(
             radius: 16,
@@ -817,37 +823,47 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
                     fontWeight: FontWeight.w700)),
           ),
           const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-                bottomRight: Radius.circular(16),
-                bottomLeft: Radius.circular(4),
-              ),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2)),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: List.generate(
-                3,
-                (i) => Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.4),
-                    shape: BoxShape.circle,
-                  ),
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                  bottomLeft: Radius.circular(4),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2)),
+                ],
               ),
+              child: _streamingPartial.isNotEmpty
+                  ? Text(
+                      _streamingPartial,
+                      style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.onBackground,
+                          height: 1.5),
+                    )
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(
+                        3,
+                        (i) => Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.4),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    ),
             ),
           ),
         ],

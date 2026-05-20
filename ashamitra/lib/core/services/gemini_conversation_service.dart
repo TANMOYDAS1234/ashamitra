@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../constants/app_config.dart';
@@ -40,6 +41,7 @@ class ConversationResponse {
 }
 
 class GeminiConversationService {
+  // ignore: unused_element
   static String get _url => AppConfig.geminiUrlWithKey;
 
   // ── System prompt — defines the assistant's persona and rules ─────────────
@@ -192,6 +194,7 @@ ${_moduleContext(caseType)}
     required List<ConversationTurn> history,
     required String newInput,
     required Map<String, bool> currentAnswers,
+    void Function(String partial)? onPartialResponse,
   }) async {
     if (!AppConfig.hasGeminiKey) {
       return _offlineFallback(newInput, caseType);
@@ -254,30 +257,72 @@ extracted_answers শুধু সেই প্রশ্নগুলো যা �
 ''';
 
     try {
-      final response = await http.post(
-        Uri.parse(_url),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'contents': [
-            {
-              'parts': [
-                {'text': prompt}
-              ]
+      // ── SSE streaming: first tokens arrive in ~1-2s, not 12s ────────────────
+      final request = http.Request(
+        'POST',
+        Uri.parse(AppConfig.geminiStreamUrlWithKey),
+      );
+      request.headers['Content-Type'] = 'application/json';
+      request.body = jsonEncode({
+        'contents': [
+          {
+            'parts': [{'text': prompt}]
+          }
+        ],
+        'generationConfig': {
+          'temperature': 0.2,
+          'maxOutputTokens': 800,
+          'stopSequences': ['```'],
+        },
+      });
+
+      final streamedResponse = await http.Client()
+          .send(request)
+          .timeout(const Duration(seconds: 20));
+
+      if (streamedResponse.statusCode != 200) {
+        return _offlineFallback(newInput, caseType);
+      }
+
+      // Accumulate SSE chunks — each line is "data: {...}" or empty
+      final buffer = StringBuffer();
+      final jsonAccumulator = StringBuffer();
+
+      await for (final chunk in streamedResponse.stream
+          .transform(const Utf8Decoder())
+          .transform(const LineSplitter())) {
+        if (!chunk.startsWith('data: ')) continue;
+        final data = chunk.substring(6).trim();
+        if (data == '[DONE]' || data.isEmpty) continue;
+
+        try {
+          final chunkJson = jsonDecode(data) as Map<String, dynamic>;
+          final text = (chunkJson['candidates']?[0]?['content']?['parts']
+                  ?[0]?['text'] as String?) ??
+              '';
+          if (text.isEmpty) continue;
+          buffer.write(text);
+          jsonAccumulator.write(text);
+
+          // Fire partial callback with the spoken portion only (before JSON)
+          if (onPartialResponse != null) {
+            final partial = buffer.toString();
+            // Only send partial if it looks like natural language (not JSON yet)
+            if (!partial.trimLeft().startsWith('{')) {
+              onPartialResponse(partial);
             }
-          ],
-          'generationConfig': {'temperature': 0.2, 'maxOutputTokens': 600},
-        }),
-      ).timeout(const Duration(seconds: 12));
+          }
+        } catch (_) {
+          // Malformed chunk — skip
+        }
+      }
 
-      if (response.statusCode != 200) return _offlineFallback(newInput, caseType);
-
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      final raw =
-          (body['candidates'][0]['content']['parts'][0]['text'] as String)
-              .trim()
-              .replaceAll('```json', '')
-              .replaceAll('```', '')
-              .trim();
+      final raw = jsonAccumulator
+          .toString()
+          .trim()
+          .replaceAll('```json', '')
+          .replaceAll('```', '')
+          .trim();
 
       final json = jsonDecode(raw) as Map<String, dynamic>;
 
@@ -312,7 +357,7 @@ extracted_answers শুধু সেই প্রশ্নগুলো যা �
     final lower = input.toLowerCase();
 
     // Emergency — full token list covering all dialects
-    const _emergencyWords = [
+    const emergencyWords = [
       'খিঁচুনি', 'খিচুনি', 'খিঁচুনি হইছে', 'খিচুনি দিছে',
       'অজ্ঞান', 'জ্ঞান নেই', 'জ্ঞান নাই', 'সাড়া নেই', 'সাড়া নাই',
       'শ্বাস বন্ধ', 'দম বন্ধ', 'শ্বাস নিতে পারছে না', 'শ্বাস নিতে পারতেছে না',
@@ -321,7 +366,7 @@ extracted_answers শুধু সেই প্রশ্নগুলো যা �
       'unconscious', 'seizure', 'convulsion', 'not breathing', 'fits',
       'khichuni', 'nishwas bandi',
     ];
-    if (_emergencyWords.any((w) => lower.contains(w))) {
+    if (emergencyWords.any((w) => lower.contains(w))) {
       return const ConversationResponse(
         spokenResponse: 'এটি জরুরি অবস্থা! এখনই ১০৮ কল করুন এবং রোগীকে বাম কাতে শোয়ান।',
         extractedAnswers: {},

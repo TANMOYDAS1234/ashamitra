@@ -23,7 +23,14 @@ class AppConfig {
   static const geminiUrl =
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
+  static const geminiStreamUrl =
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent';
+
   static String get geminiUrlWithKey => '$geminiUrl?key=$geminiApiKey';
+
+  // alt=sse makes the server send Server-Sent Events so we get chunks immediately
+  static String get geminiStreamUrlWithKey =>
+      '$geminiStreamUrl?alt=sse&key=$geminiApiKey';
 
   /// True when a valid Gemini key is available — used to decide online vs offline path
   static bool get hasGeminiKey => geminiApiKey.isNotEmpty;
