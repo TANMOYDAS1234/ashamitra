@@ -12,6 +12,7 @@ import '../../../../shared/widgets/mic_button.dart';
 import '../../../../shared/widgets/glass_card.dart';
 import '../../../../core/services/gemini_triage_service.dart';
 import '../../../../core/services/rule_executor.dart';
+import '../../../../core/services/offline_brain.dart';
 import '../../../../core/services/clup/clup_pipeline.dart';
 import '../../../../core/services/clup/situation_extractor.dart';
 import '../../../../core/services/clup/clarification_engine.dart';
@@ -28,6 +29,7 @@ class VoiceTriageScreen extends StatefulWidget {
 class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
   final _clup = CLUPPipeline();
   final _situationExtractor = SituationExtractor();
+  final _offlineBrain = OfflineBrain();
   Map<String, bool> _preAnswers = {};
   List<String> _extractedSymptoms = [];
   _TriagePhase _phase = _TriagePhase.situation;
@@ -117,6 +119,8 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
     _detectedLanguage = 'বাংলা';
     _initTts();
     _initStt();
+    // Initialize offline brain with loaded rule engine
+    _offlineBrain.init(Get.find<RuleExecutor>());
     // Voice detection path: situation already spoken at SelectCaseScreen,
     // skip Phase 1 UI and go straight to question generation.
     if (_situation.isNotEmpty) _generateQuestions(_situation);
@@ -583,8 +587,39 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
         return;
       }
 
-      // Offline path: just go to next question in list
+      // Offline path: OfflineBrain picks the most urgent next question
       if (_isOffline) {
+        final confirmedYes = _answers.entries
+            .where((e) => e.value == true)
+            .map((e) => e.key)
+            .toSet();
+        final next = _offlineBrain.getNextQuestion(
+          remaining: _questions,
+          confirmedYes: confirmedYes,
+          lastAnsweredId: qId,
+          lastAnswerWasYes: isYes,
+        );
+        if (next.shouldFinish) {
+          _submitAnswers();
+          return;
+        }
+        // Speak immediate action first if danger sign confirmed
+        if (next.immediateActionBn != null) {
+          setState(() {
+            _statusText = next.immediateActionBn!;
+            _orbState = OrbState.processing;
+          });
+          await _tts.speak(next.immediateActionBn!);
+          if (!mounted) return;
+        }
+        // Reorder: move brain's chosen question to front
+        if (next.question != null) {
+          final idx = _questions.indexWhere((q) => q.id == next.question!.id);
+          if (idx > 0) {
+            final chosen = _questions.removeAt(idx);
+            _questions.insert(0, chosen);
+          }
+        }
         setState(() { _currentIndex = 0; _answered = false; _orbState = OrbState.idle; });
         _speakQuestion();
         return;
