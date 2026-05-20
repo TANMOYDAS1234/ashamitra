@@ -281,12 +281,12 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
     }
   }
 
-  // Speak with natural pause before question (feels less robotic)
+  // Always speak index 0 — list is reordered by Gemini after each answer
   Future<void> _speakQuestion() async {
     if (_questions.isEmpty || !mounted) return;
     await _tts.stop();
     await Future.delayed(const Duration(milliseconds: 200));
-    await _tts.speak(_questions[_currentIndex].textBn);
+    await _tts.speak(_questions[0].textBn);
   }
 
   void _startCountdown() {
@@ -441,7 +441,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
           if (snapIdx != -1) {
             _qaList.add({'question': snapshot[snapIdx].textBn, 'answer': entry.value ? 'হ্যাঁ' : 'না'});
             final liveIdx = _questions.indexWhere((q) => q.id == entry.key);
-            if (liveIdx != -1 && liveIdx >= _currentIndex) _questions.removeAt(liveIdx);
+            if (liveIdx != -1) _questions.removeAt(liveIdx);
           }
         }
       }
@@ -457,8 +457,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
 
     if (decision.isEmergency) {
       if (_questions.isEmpty) { _submitAnswers(); return; }
-      // _answer() handles _answered + stt.stop() internally
-      _answer(_questions[_currentIndex].id, _questions[_currentIndex].options[0]);
+      _answer(_questions[0].id, _questions[0].options[0]);
       return;
     }
 
@@ -513,7 +512,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
   bool _tryMatch(String text) {
     if (_questions.isEmpty) return false;
     final lower = text.toLowerCase().trim();
-    final q = _questions[_currentIndex];
+    final q = _questions[0];
 
     // Bengali has no ASCII word boundaries — use simple contains() instead of
     // a \s-boundary regex, which fails on Unicode scripts.
@@ -557,14 +556,12 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
   }
 
   void _answer(String qId, String answer) {
-    // Find question by ID (not index) to survive any list mutation
     final q = _questions.firstWhere((q) => q.id == qId,
-        orElse: () => _questions[_currentIndex]);
+        orElse: () => _questions[0]);
     final isYes = answer == q.options[0];
     _answers[qId] = isYes;
     _qaList.add({'question': q.textBn, 'answer': answer});
 
-    // Stop listening immediately — single place, no race
     _answered = true;
     _stt.stop();
     _sttFallback.stop();
@@ -575,17 +572,87 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
       _statusText = 'মাইক ট্যাপ করুন কথা বলতে';
     });
 
-    Future.delayed(const Duration(milliseconds: 300), () {
+    // Remove answered question so remaining list is always fresh
+    _questions.removeWhere((q) => q.id == qId);
+
+    Future.delayed(const Duration(milliseconds: 300), () async {
       if (!mounted) return;
-      if (_currentIndex < _questions.length - 1) {
-        setState(() {
-          _currentIndex++;
-          _answered = false; // ready for next question
-          _orbState = OrbState.idle;
-        });
-        _speakQuestion();
-      } else {
+
+      if (_questions.isEmpty) {
         _submitAnswers();
+        return;
+      }
+
+      // Offline path: just go to next question in list
+      if (_isOffline) {
+        setState(() { _currentIndex = 0; _answered = false; _orbState = OrbState.idle; });
+        _speakQuestion();
+        return;
+      }
+
+      // Online path: ask Gemini which question is most urgent next
+      try {
+        final remaining = _questions
+            .map((q) => {'id': q.id, 'text_bn': q.textBn})
+            .toList();
+        final history = _qaList
+            .map((qa) => {'q': qa['question']!, 'a': qa['answer']!})
+            .toList();
+
+        final next = await GeminiTriageService().getNextQuestion(
+          caseType: _caseType,
+          situation: _situation,
+          conversationHistory: history,
+          remainingQuestions: remaining,
+        );
+
+        if (!mounted) return;
+
+        if (next.shouldFinish) {
+          _submitAnswers();
+          return;
+        }
+
+        // Speak immediate action BEFORE next question if danger sign confirmed
+        if (next.immediateActionBn != null) {
+          setState(() {
+            _statusText = next.immediateActionBn!;
+            _orbState = OrbState.processing;
+          });
+          await _tts.speak(next.immediateActionBn!);
+          if (!mounted) return;
+        }
+
+        // Reorder: move Gemini’s chosen question to front with enriched text
+        if (next.questionId != null) {
+          final idx = _questions.indexWhere((q) => q.id == next.questionId);
+          if (idx != -1) {
+            final chosen = _questions.removeAt(idx);
+            final enriched = (next.questionTextBn != null &&
+                    next.questionTextBn!.isNotEmpty)
+                ? EngineQuestion(
+                    id: chosen.id,
+                    moduleId: chosen.moduleId,
+                    ruleId: chosen.ruleId,
+                    textBn: next.questionTextBn!,
+                    textEn: chosen.textEn,
+                    options: next.options.length >= 2
+                        ? next.options
+                        : chosen.options,
+                    actionBn: chosen.actionBn,
+                    actionEn: chosen.actionEn,
+                  )
+                : chosen;
+            _questions.insert(0, enriched);
+          }
+        }
+
+        setState(() { _currentIndex = 0; _answered = false; _orbState = OrbState.idle; });
+        _speakQuestion();
+      } catch (_) {
+        if (!mounted) return;
+        setState(() { _currentIndex = 0; _answered = false; _orbState = OrbState.idle; });
+        _speakQuestion();
       }
     });
   }
@@ -631,8 +698,9 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
       );
     }
 
-    final q = _questions[_currentIndex];
-    final total = _questions.length;
+    final q = _questions[0];
+    final total = _questions.length + _qaList.length;
+    final answered = _qaList.length;
     final screenHeight = MediaQuery.of(context).size.height;
     final orbSize = screenHeight < 700 ? 80.0 : 100.0;
 
@@ -668,13 +736,13 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
                               maxLines: 1, overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary)),
                           const SizedBox(height: 2),
-                          Text('প্রশ্ন ${_currentIndex + 1} / $total',
+                          Text('প্রশ্ন ${answered + 1} / $total',
                               style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                           const SizedBox(height: 5),
                           ClipRRect(
                             borderRadius: BorderRadius.circular(4),
                             child: LinearProgressIndicator(
-                              value: (_currentIndex + 1) / total,
+                              value: total > 0 ? (answered + 1) / total : 0,
                               backgroundColor: const Color(0xFFE0E7FF),
                               color: AppColors.primary,
                               minHeight: 6,

@@ -1,6 +1,24 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+// Result of a single conversational turn — Gemini picks the next question
+// and optionally provides an immediate action if a danger sign was just confirmed.
+class NextQuestionResult {
+  final String? questionId;
+  final String? questionTextBn;
+  final List<String> options;
+  final String? immediateActionBn;
+  final bool shouldFinish;
+
+  const NextQuestionResult({
+    this.questionId,
+    this.questionTextBn,
+    this.options = const ['হ্যাঁ', 'না'],
+    this.immediateActionBn,
+    this.shouldFinish = false,
+  });
+}
+
 class GeminiTriageService {
   static const _key = 'AIzaSyAza9BlFFmv9uSpd93g-ibAK6IcbgtIxic';
   static const _url =
@@ -97,6 +115,130 @@ Respond with ONLY this JSON array (no markdown):
       moduleQuestions
           .map((q) => {'id': q['id']!, 'text_bn': q['text_bn']!, 'options': ['হ্যাঁ', 'না']})
           .toList();
+
+  // ── CHANGE 1: Turn-by-turn conversational question selection ──────────────
+  // Called after EVERY answer. Gemini sees the full situation + all Q&A so far
+  // + remaining questions, and returns:
+  //   1. The single most clinically urgent next question ID
+  //   2. An enriched Bengali question text (situation-aware)
+  //   3. An immediate action to speak if the last answer confirmed a danger sign
+  //   4. shouldFinish=true if enough info to conclude
+  Future<NextQuestionResult> getNextQuestion({
+    required String caseType,
+    required String situation,
+    required List<Map<String, String>> conversationHistory,
+    required List<Map<String, String>> remainingQuestions,
+  }) async {
+    if (remainingQuestions.isEmpty) {
+      return const NextQuestionResult(shouldFinish: true);
+    }
+
+    final historyText = conversationHistory.isEmpty
+        ? 'এখনো কোনো প্রশ্নোত্তর হয়নি।'
+        : conversationHistory
+            .map((h) => 'প্রশ্ন: \${h[\'q\']}\nউত্তর: \${h[\'a\']}')
+            .join('\n\n');
+
+    final remainingText = remainingQuestions
+        .map((q) => '\${q[\'id\']}: \${q[\'text_bn\']}')
+        .join('\n');
+
+    final lastAnswer =
+        conversationHistory.isNotEmpty ? conversationHistory.last : null;
+    final lastAnswerContext = lastAnswer != null
+        ? 'সর্বশেষ উত্তর: "\${lastAnswer[\'a\']}" (প্রশ্ন: "\${lastAnswer[\'q\']}")':
+        '';
+
+    final prompt = '''
+তুমি একজন বিশেষজ্ঞ ক্লিনিক্যাল ট্রায়াজ সহকারী যিনি গ্রামীণ ভারতের ASHA কর্মীদের সাহায্য করেন।
+
+কেস টাইপ: $caseType
+ASHA কর্মী পরিস্থিতি বর্ণনা করেছেন: "$situation"
+
+এখন পর্যন্ত কথোপকথন:
+$historyText
+
+$lastAnswerContext
+
+বাকি প্রশ্নগুলো (id: বাংলা প্রশ্ন):
+$remainingText
+
+তোমার কাজ:
+1. সর্বশেষ উত্তরটি বিশ্লেষণ করো — যদি বিপদচিহ্ন (হ্যাঁ/তীব্র/অনেক) নিশ্চিত হয়, তাহলে একটি তাৎক্ষণিক পদক্ষেপ দাও
+2. বাকি প্রশ্নগুলো থেকে এই মুহূর্তে সবচেয়ে জরুরি প্রশ্নটি বেছে নাও
+3. যদি ইতিমধ্যে ৩+ বিপদচিহ্ন নিশ্চিত হয়েছে, তাহলে should_finish: true দাও
+
+নিয়ম:
+- শুধুমাত্র বাকি প্রশ্নের তালিকা থেকে id বেছে নাও
+- immediate_action_bn শুধু তখনই দাও যখন সত্যিকারের বিপদচিহ্ন নিশ্চিত হয়
+- options এর প্রথমটি সবসময় বিপদ আছে (হ্যাঁ), দ্বিতীয়টি বিপদ নেই (না)
+- বাংলায় উত্তর দাও
+
+শুধুমাত্র এই JSON দিয়ে উত্তর দাও (কোনো markdown নয়):
+{"next_question_id": "p1", "question_text_bn": "পরিস্থিতি-সচেতন প্রশ্নের বাংলা টেক্সট", "options": ["হ্যাঁ", "না"], "immediate_action_bn": null, "should_finish": false}
+''';
+
+    try {
+      final response = await http.post(
+        Uri.parse(_url),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'contents': [
+            {
+              'parts': [{'text': prompt}]
+            }
+          ],
+          'generationConfig': {'temperature': 0.15, 'maxOutputTokens': 512},
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode != 200) return _fallbackNext(remainingQuestions);
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final raw =
+          (body['candidates'][0]['content']['parts'][0]['text'] as String)
+              .trim()
+              .replaceAll('```json', '')
+              .replaceAll('```', '')
+              .trim();
+
+      final json = jsonDecode(raw) as Map<String, dynamic>;
+      final validIds = remainingQuestions.map((q) => q['id']!).toSet();
+
+      if (json['should_finish'] == true) {
+        return const NextQuestionResult(shouldFinish: true);
+      }
+
+      final returnedId = json['next_question_id'] as String?;
+      if (returnedId == null || !validIds.contains(returnedId)) {
+        return _fallbackNext(remainingQuestions);
+      }
+
+      final opts =
+          (json['options'] as List?)?.cast<String>() ?? ['হ্যাঁ', 'না'];
+      final action = json['immediate_action_bn'] as String?;
+
+      return NextQuestionResult(
+        questionId: returnedId,
+        questionTextBn: json['question_text_bn'] as String?,
+        options: opts.length >= 2 ? opts : ['হ্যাঁ', 'না'],
+        immediateActionBn:
+            (action != null && action.isNotEmpty) ? action : null,
+        shouldFinish: false,
+      );
+    } catch (_) {
+      return _fallbackNext(remainingQuestions);
+    }
+  }
+
+  NextQuestionResult _fallbackNext(List<Map<String, String>> remaining) {
+    if (remaining.isEmpty) return const NextQuestionResult(shouldFinish: true);
+    return NextQuestionResult(
+      questionId: remaining.first['id'],
+      questionTextBn: remaining.first['text_bn'],
+      options: const ['হ্যাঁ', 'না'],
+    );
+  }
 
   /// Online path: Gemini reads the situation and returns a prioritised
   /// ordered list of engine question IDs to ask the worker.
