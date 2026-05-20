@@ -249,6 +249,8 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
         history: List.from(_history)..removeLast(),
         newInput: input,
         currentAnswers: Map.from(_extractedAnswers),
+        turnNumber: _turnCount,
+        maxTurns: 8,
         onPartialResponse: (partial) {
           if (mounted) setState(() => _streamingPartial = partial);
         },

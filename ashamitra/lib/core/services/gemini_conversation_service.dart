@@ -194,6 +194,8 @@ ${_moduleContext(caseType)}
     required List<ConversationTurn> history,
     required String newInput,
     required Map<String, bool> currentAnswers,
+    required int turnNumber,
+    int maxTurns = 8,
     void Function(String partial)? onPartialResponse,
   }) async {
     if (!AppConfig.hasGeminiKey) {
@@ -211,12 +213,6 @@ ${_moduleContext(caseType)}
     final questionList =
         questionDescs.entries.map((e) => '${e.key}: ${e.value}').join('\n');
 
-    final alreadyKnown = currentAnswers.isEmpty
-        ? 'এখনো কিছু জানা যায়নি।'
-        : currentAnswers.entries
-            .map((e) => '${questionDescs[e.key] ?? e.key}: ${e.value ? "আছে" : "নেই"}')
-            .join(', ');
-
     // Extract vitals from the new input before sending to Gemini
     final spokenVitals = VitalsExtractor.extract(newInput);
     final vitalsSummary = VitalsExtractor.summarise(spokenVitals);
@@ -224,25 +220,54 @@ ${_moduleContext(caseType)}
         ? '\nমাপা ভাইটাল সাইন: $vitalsSummary'
         : '';
 
+    // Build turn-aware context
+    final answeredIds = currentAnswers.keys.toSet();
+    final priorityOrder = const {
+      'pregnancy':    ['p1','p3','p6','p4','p2','p5'],
+      'delivery_pnc': ['pp1','pp2','pp4','pp6','pp3','pp5'],
+      'newborn':      ['n1','n2','n3','n5','n4','n6'],
+      'child':        ['c1','c5','c2','c3','c4','c6'],
+      'emergency':    ['e1','e2','e3','e4'],
+      'immunisation': ['im4','im2','im1','im5','im3'],
+    };
+    final order = priorityOrder[moduleId] ?? <String>[];
+    final unanswered = order.where((id) => !answeredIds.contains(id)).toList();
+    final confirmedDanger = currentAnswers.entries
+        .where((e) => e.value)
+        .map((e) => questionDescs[e.key] ?? e.key)
+        .join(', ');
+    final mostUrgent = unanswered.isNotEmpty
+        ? '${questionDescs[unanswered.first] ?? unanswered.first} (${ unanswered.first})'
+        : 'সব প্রশ্নের উত্তর পাওয়া গেছে';
+    final turnsLeft = maxTurns - turnNumber;
+    // ignore: unnecessary_brace_in_string_interps
+    final turnCtx = '''
+══ কথোপকথনের বর্তমান অবস্থা ══
+প্রশ্ন নম্বর: $turnNumber / $maxTurns${turnsLeft <= 2 ? ' | সতর্কতা: মাত্র ${turnsLeft}টি প্রশ্ন বাকি' : ''}
+নিশ্চিত বিপদচিহ্ন: ${confirmedDanger.isEmpty ? 'এখনো কোনোটি নিশ্চিত নয়' : confirmedDanger}
+এখনো অজানা (${unanswered.length}টি): ${unanswered.isEmpty ? 'সব জানা' : unanswered.map((id) => '${questionDescs[id] ?? id}($id)').join(' | ')}
+সবচেয়ে জরুরি অজানা প্রশ্ন: $mostUrgent
+''';
+
     final prompt = '''
 ${_systemPrompt(caseType, moduleId)}
 
+$turnCtx
 এখন পর্যন্ত কথোপকথন:
 $historyText
 
 ASHA এইমাত্র বললেন: "$newInput"$vitalsContext
 
-ইতিমধ্যে জানা তথ্য: $alreadyKnown
-
 ক্লিনিক্যাল প্রশ্নের তালিকা (id: বিষয়):
 $questionList
 
-তোমার কাজ:
-1. ASHA যা বললেন তার উপর ভিত্তি করে স্বাভাবিকভাবে সাড়া দাও
-2. যদি বিপদচিহ্ন থাকে — তাৎক্ষণিক পদক্ষেপ বলো
-3. সবচেয়ে গুরুত্বপূর্ণ একটি প্রশ্ন জিজ্ঞেস করো যা এখনো জানা যায়নি
-4. কথোপকথন থেকে যা বোঝা গেছে তা structured আকারে বের করো
-5. যদি ৩+ বিপদচিহ্ন নিশ্চিত হয়, বা সব গুরুত্বপূর্ণ প্রশ্নের উত্তর পাওয়া গেছে — should_finish: true দাও
+তোমার কাজ (এই ক্রমে):
+1. ASHA যা বললেন স্বীকার করো — ১ বাক্যে
+2. যদি বিপদচিহ্ন নিশ্চিত হয় — তাৎক্ষণিক পদক্ষেপ বলো (১ বাক্য)
+3. উপরের "সবচেয়ে জরুরি অজানা প্রশ্ন" টি জিজ্ঞেস করো — শুধু সেটাই, অন্য কিছু নয়
+4. ইতিমধ্যে জানা প্রশ্ন আবার জিজ্ঞেস করবে না
+5. কথোপকথন থেকে নিশ্চিত তথ্য extracted_answers-এ রাখো
+6. should_finish: true দাও যদি — ২+ RED বিপদচিহ্ন নিশ্চিত, বা সব অজানা প্রশ্নের উত্তর পাওয়া গেছে, বা turn $turnNumber >= $maxTurns
 
 শুধুমাত্র এই JSON দিয়ে উত্তর দাও (কোনো markdown নয়):
 {
