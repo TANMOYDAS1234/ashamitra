@@ -13,6 +13,7 @@ import '../../../../shared/widgets/glass_card.dart';
 import '../../../../core/services/gemini_triage_service.dart';
 import '../../../../core/services/rule_executor.dart';
 import '../../../../core/services/offline_brain.dart';
+import '../../../../core/services/immediate_action_engine.dart';
 import '../../../../core/services/clup/clup_pipeline.dart';
 import '../../../../core/services/clup/situation_extractor.dart';
 import '../../../../core/services/clup/clarification_engine.dart';
@@ -593,6 +594,14 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
             .where((e) => e.value == true)
             .map((e) => e.key)
             .toSet();
+
+        // Change 3: ImmediateActionEngine fires protocol action for danger sign
+        final action = ImmediateActionEngine.getAction(
+          answeredId: qId,
+          answerWasYes: isYes,
+          confirmedYes: confirmedYes,
+        );
+
         final next = _offlineBrain.getNextQuestion(
           remaining: _questions,
           confirmedYes: confirmedYes,
@@ -603,13 +612,12 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
           _submitAnswers();
           return;
         }
-        // Speak immediate action first if danger sign confirmed
-        if (next.immediateActionBn != null) {
+        if (action != null) {
           setState(() {
-            _statusText = next.immediateActionBn!;
+            _statusText = action.textBn;
             _orbState = OrbState.processing;
           });
-          await _tts.speak(next.immediateActionBn!);
+          await _tts.speak(action.textBn);
           if (!mounted) return;
         }
         // Reorder: move brain's chosen question to front
@@ -626,7 +634,26 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
       }
 
       // Online path: ask Gemini which question is most urgent next
+      // Change 3: ImmediateActionEngine fires protocol action regardless of online/offline
       try {
+        final confirmedYesOnline = _answers.entries
+            .where((e) => e.value == true)
+            .map((e) => e.key)
+            .toSet();
+        final action = ImmediateActionEngine.getAction(
+          answeredId: qId,
+          answerWasYes: isYes,
+          confirmedYes: confirmedYesOnline,
+        );
+        if (action != null) {
+          setState(() {
+            _statusText = action.textBn;
+            _orbState = OrbState.processing;
+          });
+          await _tts.speak(action.textBn);
+          if (!mounted) return;
+        }
+
         final remaining = _questions
             .map((q) => {'id': q.id, 'text_bn': q.textBn})
             .toList();
@@ -646,16 +673,6 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
         if (next.shouldFinish) {
           _submitAnswers();
           return;
-        }
-
-        // Speak immediate action BEFORE next question if danger sign confirmed
-        if (next.immediateActionBn != null) {
-          setState(() {
-            _statusText = next.immediateActionBn!;
-            _orbState = OrbState.processing;
-          });
-          await _tts.speak(next.immediateActionBn!);
-          if (!mounted) return;
         }
 
         // Reorder: move Gemini’s chosen question to front with enriched text

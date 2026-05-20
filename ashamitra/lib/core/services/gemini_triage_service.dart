@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../constants/app_config.dart';
 
 // Result of a single conversational turn — Gemini picks the next question
 // and optionally provides an immediate action if a danger sign was just confirmed.
@@ -20,9 +21,9 @@ class NextQuestionResult {
 }
 
 class GeminiTriageService {
-  static const _key = 'AIzaSyAza9BlFFmv9uSpd93g-ibAK6IcbgtIxic';
-  static const _url =
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$_key';
+  // Key injected at build time: flutter run --dart-define=GEMINI_API_KEY=...
+  // Falls back to offline mode gracefully when key is absent.
+  static String get _url => AppConfig.geminiUrlWithKey;
 
   /// Online path: Gemini reads the situation and returns enriched engine
   /// questions — same IDs, same deterministic evaluation, but situation-aware
