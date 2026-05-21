@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -15,6 +16,8 @@ import '../../../../core/services/offline_brain.dart';
 import '../../../../core/services/immediate_action_engine.dart';
 import '../../../../core/services/clup/clup_pipeline.dart';
 import '../../../../core/services/clup/situation_extractor.dart';
+import '../../../../features/auth/controller/auth_controller.dart';
+import '../../../../core/services/local_storage_service.dart';
 
 class VoiceTriageScreen extends StatefulWidget {
   const VoiceTriageScreen({super.key});
@@ -227,7 +230,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
       _isProcessing = true;
       _transcript = input;
       _orbState = OrbState.processing;
-      _statusText = 'বিশ্লেষণ করছি...';
+      _statusText = 'সংযোগ করছি...';
     });
     _history.add(ConversationTurn(role: 'asha', text: input));
     _turnCount++;
@@ -243,6 +246,8 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
   // ── Online: true Gemini conversation ──────────────────────────
   Future<void> _processOnline(String input, {bool uncertain = false}) async {
     try {
+      final authToken = LocalStorageService.get('jwt_token');
+      if (mounted) setState(() => _statusText = 'সংযোগ করছি...');
       final response = await _conversationService.respond(
         caseType: _caseType,
         moduleId: _moduleId,
@@ -251,13 +256,17 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
         currentAnswers: Map.from(_extractedAnswers),
         turnNumber: _turnCount,
         maxTurns: 8,
+        authToken: authToken,
         onPartialResponse: (partial) {
           if (mounted) setState(() => _streamingPartial = partial);
         },
       );
 
       if (!mounted) return;
-      setState(() => _streamingPartial = '');
+      setState(() {
+        _streamingPartial = '';
+        _statusText = 'বিশ্লেষণ করছি...';
+      });
 
       // Gap 5: if uncertain, only accept false (no danger) extractions
       final toMerge = uncertain
@@ -293,8 +302,13 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
         await Future.delayed(const Duration(milliseconds: 500));
         _submitAnswers();
       }
-    } catch (_) {
+    } on TimeoutException {
       if (!mounted) return;
+      setState(() => _isOffline = true);
+      await _processOffline(input, uncertain: uncertain);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isOffline = true);
       await _processOffline(input, uncertain: uncertain);
     }
   }
@@ -435,12 +449,31 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
       lastAnswerWasYes: extraction.preAnswers.values.firstOrNull ?? false,
     );
 
+    // If a combination fired, speak the alert and finish immediately
+    if (next.combinationAlertBn != null) {
+      _riskLevel = 'emergency';
+      _history.add(ConversationTurn(role: 'assistant', text: next.combinationAlertBn!));
+      setState(() {
+        _isProcessing = false;
+        _orbState = OrbState.idle;
+        _statusText = 'মাইক ট্যাপ করুন কথা বলতে';
+        _transcript = '';
+      });
+      await _tts.speak(next.combinationAlertBn!);
+      if (mounted) {
+        await Future.delayed(const Duration(milliseconds: 800));
+        _submitAnswers();
+      }
+      return;
+    }
+
     final nextQ = next.question ?? remaining.first;
 
-    // Build natural response: acknowledge + immediate action + next question
+    // Build natural response: acknowledge + combo alert OR immediate action + next question
     final ack = _buildAcknowledgement(input, extraction.extractedSymptoms);
-    responseText = immediateAction != null
-        ? '$ack $immediateAction ${nextQ.textBn}'
+    final alert = next.combinationAlertBn ?? immediateAction;
+    responseText = alert != null
+        ? '$ack $alert ${nextQ.textBn}'
         : '$ack ${nextQ.textBn}';
 
     _history.add(ConversationTurn(role: 'assistant', text: responseText));
@@ -707,7 +740,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
                     const SizedBox(height: 6),
                     Text(
                       _isProcessing
-                          ? 'বিশ্লেষণ করছি...'
+                          ? _statusText
                           : _isListening
                               ? '🔴 শুনছি — থামাতে আবার চাপুন'
                               : _statusText,
