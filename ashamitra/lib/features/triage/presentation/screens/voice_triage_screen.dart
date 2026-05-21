@@ -99,8 +99,8 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
   Future<void> _initTts() async {
     await _tts.setEngine('com.google.android.tts');
     await _tts.setLanguage('bn-IN');
-    await _tts.setSpeechRate(0.48);
-    await _tts.setPitch(1.05);
+    await _tts.setSpeechRate(0.42);  // slower = more natural for Bengali
+    await _tts.setPitch(1.0);        // neutral pitch sounds most human
     await _tts.setVolume(1.0);
     await _tts.awaitSpeakCompletion(true);
     _tts.setStartHandler(() {
@@ -113,7 +113,32 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
       if (mounted) setState(() => _orbState = OrbState.idle);
     });
     await Future.delayed(const Duration(milliseconds: 600));
-    await _tts.speak('পরিস্থিতি বলুন বা প্রশ্ন করুন');
+    await _speakNatural('পরিস্থিতি বলুন বা প্রশ্ন করুন');
+  }
+
+  // ── Natural speech: splits on punctuation for human-like pauses ──
+  Future<void> _speakNatural(String text) async {
+    if (text.isEmpty) return;
+    // Split on sentence-ending punctuation keeping the delimiter
+    final sentences = text
+        .split(RegExp(r'(?<=[।!?\.])\s*'))
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+
+    if (sentences.length <= 1) {
+      await _tts.speak(text);
+      return;
+    }
+
+    for (int i = 0; i < sentences.length; i++) {
+      if (!mounted) return;
+      await _tts.speak(sentences[i]);
+      // Natural pause between sentences (shorter for last)
+      if (i < sentences.length - 1) {
+        await Future.delayed(const Duration(milliseconds: 180));
+      }
+    }
   }
 
   // ── STT init ──────────────────────────────────────────────────
@@ -293,7 +318,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
       });
 
       // Speak the response
-      await _tts.speak(response.spokenResponse);
+      await _speakNatural(response.spokenResponse);
 
       if (!mounted) return;
 
@@ -355,7 +380,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
         _statusText = 'মাইক ট্যাপ করুন কথা বলতে';
         _transcript = '';
       });
-      await _tts.speak(emergencyText);
+      await _speakNatural(emergencyText);
       if (mounted) {
         await Future.delayed(const Duration(milliseconds: 800));
         _submitAnswers();
@@ -377,7 +402,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
         _statusText = 'মাইক ট্যাপ করুন কথা বলতে';
         _transcript = '';
       });
-      await _tts.speak(emergencyText);
+      await _speakNatural(emergencyText);
       if (mounted) {
         await Future.delayed(const Duration(milliseconds: 800));
         _submitAnswers();
@@ -441,7 +466,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
         _statusText = 'মাইক ট্যাপ করুন কথা বলতে';
         _transcript = '';
       });
-      await _tts.speak(responseText);
+      await _speakNatural(responseText);
       if (mounted) {
         await Future.delayed(const Duration(milliseconds: 500));
         _submitAnswers();
@@ -467,7 +492,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
         _statusText = 'মাইক ট্যাপ করুন কথা বলতে';
         _transcript = '';
       });
-      await _tts.speak(next.combinationAlertBn!);
+      await _speakNatural(next.combinationAlertBn!);
       if (mounted) {
         await Future.delayed(const Duration(milliseconds: 800));
         _submitAnswers();
@@ -492,7 +517,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
       _transcript = '';
     });
 
-    await _tts.speak(responseText);
+    await _speakNatural(responseText);
   }
 
   String _buildAcknowledgement(String input, List<String> symptoms) {
