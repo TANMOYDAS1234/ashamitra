@@ -304,12 +304,20 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
       }
     } on TimeoutException {
       if (!mounted) return;
-      setState(() => _isOffline = true);
-      await _processOffline(input, uncertain: uncertain);
+      setState(() {
+        _isProcessing = false;
+        _orbState = OrbState.idle;
+        _statusText = 'সার্ভার সাড়া দিচ্ছে না — আবার চেষ্টা করুন';
+        _transcript = '';
+      });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _isOffline = true);
-      await _processOffline(input, uncertain: uncertain);
+      setState(() {
+        _isProcessing = false;
+        _orbState = OrbState.idle;
+        _statusText = 'নেটওয়ার্ক সমস্যা — আবার চেষ্টা করুন';
+        _transcript = '';
+      });
     }
   }
 
