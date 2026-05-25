@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_gradients.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/components/app_header.dart';
 import '../../../admin/controller/admin_controller.dart';
 
 class AdminAddAshaScreen extends StatefulWidget {
@@ -30,41 +34,41 @@ class _AdminAddAshaScreenState extends State<AdminAddAshaScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     setState(() => _saving = true);
     final ctrl = Get.find<AdminController>();
-    
+
     final ok = await ctrl.addAshaWorker(
       phone: _phone.text.trim(),
       name: _name.text.trim(),
       block: _block.text.trim(),
       district: _district.text.trim(),
     );
-    
+
     setState(() => _saving = false);
-    
+
     if (ok) {
       Get.back();
       Get.snackbar(
         'admin_success'.tr,
         'admin_add_success'.tr,
         backgroundColor: AppColors.safeGreen,
-        colorText: Colors.white,
+        colorText: AppColors.onPrimary,
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(16),
         borderRadius: 12,
-        icon: const Icon(Icons.check_circle_outline_rounded, color: Colors.white),
+        icon: const Icon(Icons.check_circle_outline_rounded, color: AppColors.onPrimary),
       );
     } else {
       Get.snackbar(
         'admin_add_error'.tr,
         ctrl.errorMsg.value,
         backgroundColor: AppColors.emergencyRed,
-        colorText: Colors.white,
+        colorText: AppColors.onPrimary,
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(16),
         borderRadius: 12,
-        icon: const Icon(Icons.error_outline_rounded, color: Colors.white),
+        icon: const Icon(Icons.error_outline_rounded, color: AppColors.onPrimary),
       );
     }
   }
@@ -77,38 +81,7 @@ class _AdminAddAshaScreenState extends State<AdminAddAshaScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              // ── Header Section ───────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: Get.back,
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        padding: const EdgeInsets.all(12),
-                        elevation: 2,
-                        shadowColor: Colors.black.withValues(alpha: 0.1),
-                      ),
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        size: 16,
-                        color: AppColors.onBackground,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Text(
-                      'admin_add_asha'.tr,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                        color: AppColors.onBackground,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              AppHeader(title: 'admin_add_asha'.tr),
 
               // ── Form Area ────────────────────────────────────────
               Expanded(
@@ -124,15 +97,9 @@ class _AdminAddAshaScreenState extends State<AdminAddAshaScreen> {
                         Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.03),
-                                blurRadius: 20,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
+                            color: AppColors.surface,
+                            borderRadius: AppRadius.xxlR,
+                            boxShadow: AppShadows.mid,
                           ),
                           child: Column(
                             children: [
@@ -173,12 +140,12 @@ class _AdminAddAshaScreenState extends State<AdminAddAshaScreen> {
                             onPressed: _saving ? null : _submit,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.white,
+                              foregroundColor: AppColors.onPrimary,
                               disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.6),
                               elevation: 0,
                               shadowColor: AppColors.primary.withValues(alpha: 0.3),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: AppRadius.lgR,
                               ),
                             ),
                             child: _saving
@@ -186,16 +153,16 @@ class _AdminAddAshaScreenState extends State<AdminAddAshaScreen> {
                                     width: 24,
                                     height: 24,
                                     child: CircularProgressIndicator(
-                                      color: Colors.white,
+                                      color: AppColors.onPrimary,
                                       strokeWidth: 2.5,
                                     ),
                                   )
                                 : Text(
                                     'admin_save'.tr,
-                                    style: const TextStyle(
+                                    style: AppTextStyles.labelLg.copyWith(
+                                      color: AppColors.onPrimary,
                                       fontSize: 16,
                                       fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.2,
                                     ),
                                   ),
                           ),
@@ -224,54 +191,46 @@ class _AdminAddAshaScreenState extends State<AdminAddAshaScreen> {
       controller: ctrl,
       keyboardType: keyboardType,
       validator: validator,
-      style: const TextStyle(
-        fontSize: 15,
-        fontWeight: FontWeight.w500,
-        color: AppColors.onBackground,
-      ),
+      style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(
-          fontSize: 14,
+        labelStyle: AppTextStyles.body.copyWith(
           fontWeight: FontWeight.w500,
           color: AppColors.textSecondary,
         ),
-        floatingLabelStyle: const TextStyle(
-          fontSize: 14,
+        floatingLabelStyle: AppTextStyles.body.copyWith(
           fontWeight: FontWeight.w600,
           color: AppColors.primary,
         ),
         prefixIcon: Icon(
-          icon, 
-          color: AppColors.primary.withValues(alpha: 0.8), 
+          icon,
+          color: AppColors.primary.withValues(alpha: 0.8),
           size: 22,
         ),
         filled: true,
         fillColor: const Color(0xFFF8FAFC), // Ultra-light grey for form depth
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: AppRadius.lgR,
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: AppRadius.lgR,
           borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: AppRadius.lgR,
           borderSide: const BorderSide(color: AppColors.primary, width: 1.8),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: AppRadius.lgR,
           borderSide: const BorderSide(color: AppColors.emergencyRed, width: 1.2),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: AppRadius.lgR,
           borderSide: const BorderSide(color: AppColors.emergencyRed, width: 1.8),
         ),
-        errorStyle: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
+        errorStyle: AppTextStyles.caption.copyWith(
           color: AppColors.emergencyRed,
         ),
       ),

@@ -3,6 +3,10 @@ import 'package:get/get.dart';
 import '../../../../app/routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_gradients.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/components/app_header.dart';
 import '../../../admin/controller/admin_controller.dart';
 import '../../../../features/auth/data/models/user_model.dart';
 
@@ -21,44 +25,15 @@ class AdminAshaListScreen extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 20, 16, 16),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: Get.back,
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        padding: const EdgeInsets.all(12),
-                        elevation: 2,
-                        shadowColor: Colors.black.withValues(alpha: 0.1),
-                      ),
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                          size: 16, color: AppColors.onBackground),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Text(
-                        'admin_asha_list'.tr,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.5,
-                          color: AppColors.onBackground,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Get.toNamed(AppRoutes.adminAddAsha),
-                      style: IconButton.styleFrom(
-                        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                        padding: const EdgeInsets.all(10),
-                      ),
-                      icon: const Icon(Icons.person_add_alt_1_rounded,
-                          color: AppColors.primary, size: 22),
-                    ),
-                  ],
-                ),
+              AppHeader(
+                title: 'admin_asha_list'.tr,
+                actions: [
+                  HeaderActionCircle(
+                    icon: Icons.person_add_alt_1_rounded,
+                    onTap: () => Get.toNamed(AppRoutes.adminAddAsha),
+                    tooltip: 'Add ASHA',
+                  ),
+                ],
               ),
               Expanded(
                 child: Obx(() {
@@ -76,11 +51,7 @@ class AdminAshaListScreen extends StatelessWidget {
                               size: 64,
                               color: AppColors.textSecondary.withValues(alpha: 0.4)),
                           const SizedBox(height: 16),
-                          Text('admin_no_asha'.tr,
-                              style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textSecondary)),
+                          Text('admin_no_asha'.tr, style: AppTextStyles.labelLg),
                         ],
                       ),
                     );
@@ -120,17 +91,12 @@ class _AshaCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 14,
-              offset: const Offset(0, 4))
-        ],
+        color: AppColors.surface,
+        borderRadius: AppRadius.xlR,
+        boxShadow: AppShadows.low,
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: AppRadius.xlR,
         child: Material(
           color: Colors.transparent,
           child: Padding(
@@ -146,10 +112,10 @@ class _AshaCard extends StatelessWidget {
                   alignment: Alignment.center,
                   child: Text(
                     worker.name.isNotEmpty ? worker.name[0].toUpperCase() : 'A',
-                    style: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16),
+                    style: AppTextStyles.h3.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -157,23 +123,14 @@ class _AshaCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(worker.name,
-                          style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.onBackground,
-                              letterSpacing: -0.1)),
+                      Text(worker.name, style: AppTextStyles.labelLg),
                       const SizedBox(height: 3),
                       Row(children: [
                         Icon(Icons.phone_android_rounded,
                             size: 13,
                             color: AppColors.textSecondary.withValues(alpha: 0.7)),
                         const SizedBox(width: 4),
-                        Text(worker.phone,
-                            style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.textSecondary)),
+                        Text(worker.phone, style: AppTextStyles.caption),
                       ]),
                       if (worker.block.isNotEmpty || worker.district.isNotEmpty) ...[
                         const SizedBox(height: 4),
@@ -186,10 +143,7 @@ class _AshaCard extends StatelessWidget {
                             child: Text('${worker.block}, ${worker.district}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w400,
-                                    color: AppColors.textSecondary)),
+                                style: AppTextStyles.caption),
                           ),
                         ]),
                       ],
@@ -204,19 +158,16 @@ class _AshaCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
                           color: statusColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10)),
+                          borderRadius: AppRadius.smR),
                       child: Text(
                         worker.isActive ? 'admin_active'.tr : 'admin_inactive'.tr,
-                        style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: statusColor),
+                        style: AppTextStyles.overline.copyWith(color: statusColor),
                       ),
                     ),
                     const SizedBox(height: 10),
                     InkWell(
                       onTap: () => _confirmToggle(context),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: AppRadius.smR,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
@@ -224,15 +175,14 @@ class _AshaCard extends StatelessWidget {
                                     ? AppColors.emergencyRed
                                     : AppColors.safeGreen)
                                 .withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(8)),
+                            borderRadius: AppRadius.smR),
                         child: Text(
                           worker.isActive ? 'admin_remove'.tr : 'admin_reactivate'.tr,
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: worker.isActive
-                                  ? AppColors.emergencyRed
-                                  : AppColors.safeGreen),
+                          style: AppTextStyles.overline.copyWith(
+                            color: worker.isActive
+                                ? AppColors.emergencyRed
+                                : AppColors.safeGreen,
+                          ),
                         ),
                       ),
                     ),
@@ -257,8 +207,8 @@ class _AshaCard extends StatelessWidget {
 
     Get.dialog(
       Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.xxlR),
+        backgroundColor: AppColors.surface,
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -277,19 +227,14 @@ class _AshaCard extends StatelessWidget {
                     size: 32),
               ),
               const SizedBox(height: 20),
-              Text(titleText,
-                  style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.onBackground)),
+              Text(titleText, style: AppTextStyles.h3),
               const SizedBox(height: 10),
               Text(
                 'admin_confirm_action'.tr
                     .replaceAll('@name', worker.name)
                     .replaceAll('@action', actionText),
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                    fontSize: 14, color: AppColors.textSecondary, height: 1.4),
+                style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 24),
               Row(
@@ -300,14 +245,14 @@ class _AshaCard extends StatelessWidget {
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: AppRadius.lgR,
                             side: const BorderSide(color: Color(0xFFE2E8F0))),
                       ),
                       child: Text('cancel'.tr,
-                          style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary)),
+                          style: AppTextStyles.body.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          )),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -323,15 +268,13 @@ class _AshaCard extends StatelessWidget {
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: actionColor,
-                        foregroundColor: Colors.white,
+                        foregroundColor: AppColors.onPrimary,
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
+                            borderRadius: AppRadius.lgR),
                       ),
-                      child: Text(actionText,
-                          style: const TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w700)),
+                      child: Text(actionText, style: AppTextStyles.labelLg.copyWith(color: AppColors.onPrimary)),
                     ),
                   ),
                 ],

@@ -62,7 +62,7 @@ class AppInput extends StatelessWidget {
             suffixIcon: suffixIcon,
             counterText: '',
             filled: true,
-            fillColor: Colors.white.withOpacity(0.9),
+            fillColor: Colors.white.withValues(alpha: 0.9),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Color(0xFFE0E7FF)),

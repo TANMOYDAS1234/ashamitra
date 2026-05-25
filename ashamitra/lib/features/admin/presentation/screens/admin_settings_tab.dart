@@ -4,6 +4,9 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../core/services/language_controller.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_gradients.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../../../auth/controller/auth_controller.dart';
 
@@ -54,7 +57,7 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
       'profile_updated'.tr,
       'profile_updated_msg'.tr,
       backgroundColor: AppColors.safeGreen,
-      colorText: Colors.white,
+      colorText: AppColors.onPrimary,
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(16),
       borderRadius: 12,
@@ -73,9 +76,9 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
         child: Column(
@@ -118,9 +121,9 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
         child: Column(
@@ -133,67 +136,70 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
                   borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(height: 16),
-            Text('change_language'.tr,
-                style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.onBackground)),
+            Text('change_language'.tr, style: AppTextStyles.h3),
             const SizedBox(height: 16),
             Obx(() => Column(
                   children: List.generate(LanguageController.labels.length, (i) {
                     final selected = _lang.selectedIndex.value == i;
                     final badges = ['বাং', 'हिं', 'En'];
-                    return GestureDetector(
-                      onTap: () { _lang.setLanguage(i); Navigator.pop(context); },
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 14),
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? AppColors.primary.withValues(alpha: 0.06)
-                              : const Color(0xFFF7F8FF),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
+                    return Material(
+                      color: selected
+                          ? AppColors.primary.withValues(alpha: 0.06)
+                          : AppColors.background,
+                      borderRadius: AppRadius.lgR,
+                      child: InkWell(
+                        onTap: () { _lang.setLanguage(i); Navigator.pop(context); },
+                        borderRadius: AppRadius.lgR,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 14),
+                          decoration: BoxDecoration(
                             color: selected
-                                ? AppColors.primary
-                                : const Color(0xFFE2E8F0),
-                            width: selected ? 1.5 : 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 36, height: 36,
-                              decoration: BoxDecoration(
-                                color: selected
-                                    ? AppColors.primary.withValues(alpha: 0.12)
-                                    : AppColors.primary.withValues(alpha: 0.06),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(badges[i],
-                                  style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.primary)),
+                                ? AppColors.primary.withValues(alpha: 0.06)
+                                : AppColors.background,
+                            borderRadius: AppRadius.lgR,
+                            border: Border.all(
+                              color: selected
+                                  ? AppColors.primary
+                                  : const Color(0xFFE2E8F0),
+                              width: selected ? 1.5 : 1,
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(LanguageController.labels[i],
-                                  style: TextStyle(
-                                      fontSize: 14,
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 36, height: 36,
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? AppColors.primary.withValues(alpha: 0.12)
+                                      : AppColors.primary.withValues(alpha: 0.06),
+                                  borderRadius: AppRadius.smR,
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(badges[i],
+                                    style: AppTextStyles.label.copyWith(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w800,
+                                    )),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(LanguageController.labels[i],
+                                    style: AppTextStyles.body.copyWith(
                                       fontWeight: selected
                                           ? FontWeight.w700
                                           : FontWeight.w500,
                                       color: selected
                                           ? AppColors.primary
-                                          : AppColors.onBackground)),
-                            ),
-                            if (selected)
-                              const Icon(Icons.check_circle_rounded,
-                                  color: AppColors.primary, size: 20),
-                          ],
+                                          : AppColors.onBackground,
+                                    )),
+                              ),
+                              if (selected)
+                                const Icon(Icons.check_circle_rounded,
+                                    color: AppColors.primary, size: 20),
+                            ],
+                          ),
                         ),
                       ),
                     );
@@ -209,8 +215,8 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
     showDialog(
       context: context,
       builder: (_) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.xxlR),
+        backgroundColor: AppColors.surface,
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -225,18 +231,11 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
                     color: AppColors.emergencyRed, size: 28),
               ),
               const SizedBox(height: 20),
-              Text('admin_logout'.tr,
-                  style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.onBackground)),
+              Text('admin_logout'.tr, style: AppTextStyles.h3),
               const SizedBox(height: 8),
-              const Text('লগআউট করতে চান?',
+              Text('লগআউট করতে চান?',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                      height: 1.4)),
+                  style: AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
               const SizedBox(height: 24),
               Row(
                 children: [
@@ -246,14 +245,12 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: AppRadius.mdR,
                             side: const BorderSide(
                                 color: Color(0xFFE2E8F0))),
                       ),
                       child: Text('cancel'.tr,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary)),
+                          style: AppTextStyles.labelLg.copyWith(color: AppColors.textSecondary)),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -265,15 +262,14 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.emergencyRed,
-                        foregroundColor: Colors.white,
+                        foregroundColor: AppColors.onPrimary,
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                            borderRadius: AppRadius.mdR),
                       ),
                       child: Text('admin_logout'.tr,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w700)),
+                          style: AppTextStyles.labelLg.copyWith(color: AppColors.onPrimary)),
                     ),
                   ),
                 ],
@@ -295,11 +291,7 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Settings',
-                  style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.onBackground)),
+              Text('Settings', style: AppTextStyles.h2),
               const SizedBox(height: 20),
 
               // ── Avatar card ──────────────────────────────────────
@@ -338,9 +330,9 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
                                     color: AppColors.primary,
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                        color: Colors.white, width: 2)),
+                                        color: AppColors.surface, width: 2)),
                                 child: const Icon(Icons.camera_alt_rounded,
-                                    size: 12, color: Colors.white),
+                                    size: 12, color: AppColors.onPrimary),
                               ),
                             ),
                           ],
@@ -351,16 +343,9 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(u?.name ?? 'Admin',
-                                style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.onBackground)),
+                            Text(u?.name ?? 'Admin', style: AppTextStyles.h3),
                             const SizedBox(height: 4),
-                            Text(u?.phone ?? '',
-                                style: const TextStyle(
-                                    fontSize: 13,
-                                    color: AppColors.textSecondary)),
+                            Text(u?.phone ?? '', style: AppTextStyles.bodySm),
                             const SizedBox(height: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -368,12 +353,9 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
                               decoration: BoxDecoration(
                                   color: AppColors.primary
                                       .withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(8)),
-                              child: const Text('Admin',
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.primary)),
+                                  borderRadius: AppRadius.smR),
+                              child: Text('Admin',
+                                  style: AppTextStyles.overline.copyWith(color: AppColors.primary)),
                             ),
                           ],
                         ),
@@ -391,11 +373,7 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Edit Profile',
-                          style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.onBackground)),
+                      Text('Edit Profile', style: AppTextStyles.label),
                       const SizedBox(height: 16),
                       _Field(ctrl: _name, label: 'admin_full_name'.tr,
                           icon: Icons.person_rounded,
@@ -417,20 +395,18 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
                           onPressed: _saving ? null : _save,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
+                            foregroundColor: AppColors.onPrimary,
                             elevation: 0,
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
+                                borderRadius: AppRadius.mdR),
                           ),
                           child: _saving
                               ? const SizedBox(
                                   width: 20, height: 20,
                                   child: CircularProgressIndicator(
-                                      color: Colors.white, strokeWidth: 2))
+                                      color: AppColors.onPrimary, strokeWidth: 2))
                               : Text('admin_save'.tr,
-                                  style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700)),
+                                  style: AppTextStyles.labelLg.copyWith(color: AppColors.onPrimary)),
                         ),
                       ),
                     ],
@@ -449,9 +425,7 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
                       color: AppColors.sky,
                       onTap: _showLanguageSheet,
                       trailing: Obx(() => Text(_lang.currentLabel,
-                          style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary))),
+                          style: AppTextStyles.caption)),
                     ),
                   ],
                 ),
@@ -459,30 +433,32 @@ class _AdminSettingsTabState extends State<AdminSettingsTab> {
               const SizedBox(height: 16),
 
               // ── Logout ───────────────────────────────────────────
-              GestureDetector(
-                onTap: _confirmLogout,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    color: AppColors.emergencyRed.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                        color:
-                            AppColors.emergencyRed.withValues(alpha: 0.2)),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.logout_rounded,
-                          color: AppColors.emergencyRed, size: 20),
-                      SizedBox(width: 8),
-                      Text('Logout',
-                          style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.emergencyRed)),
-                    ],
+              Material(
+                color: AppColors.emergencyRed.withValues(alpha: 0.06),
+                borderRadius: AppRadius.lgR,
+                child: InkWell(
+                  onTap: _confirmLogout,
+                  borderRadius: AppRadius.lgR,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      color: AppColors.emergencyRed.withValues(alpha: 0.06),
+                      borderRadius: AppRadius.lgR,
+                      border: Border.all(
+                          color:
+                              AppColors.emergencyRed.withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.logout_rounded,
+                            color: AppColors.emergencyRed, size: 20),
+                        const SizedBox(width: 8),
+                        Text('Logout',
+                            style: AppTextStyles.labelLg.copyWith(color: AppColors.emergencyRed)),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -505,14 +481,9 @@ class _Card extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 14,
-                offset: const Offset(0, 4))
-          ],
+          color: AppColors.surface,
+          borderRadius: AppRadius.xlR,
+          boxShadow: AppShadows.low,
         ),
         child: child,
       );
@@ -534,31 +505,28 @@ class _Field extends StatelessWidget {
   Widget build(BuildContext context) => TextFormField(
         controller: ctrl,
         validator: validator,
-        style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: AppColors.onBackground),
+        style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500),
         decoration: InputDecoration(
           labelText: label,
           prefixIcon: Icon(icon, color: AppColors.primary, size: 18),
           filled: true,
           fillColor: const Color(0xFFF8FAFC),
           border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppRadius.mdR,
               borderSide: BorderSide.none),
           enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppRadius.mdR,
               borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
           focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppRadius.mdR,
               borderSide:
                   const BorderSide(color: AppColors.primary, width: 1.5)),
           errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppRadius.mdR,
               borderSide:
                   const BorderSide(color: AppColors.emergencyRed)),
           focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppRadius.mdR,
               borderSide: const BorderSide(
                   color: AppColors.emergencyRed, width: 1.5)),
         ),
@@ -582,7 +550,7 @@ class _SettingsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.mdR,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Row(
@@ -591,16 +559,13 @@ class _SettingsRow extends StatelessWidget {
                 width: 36, height: 36,
                 decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10)),
+                    borderRadius: AppRadius.smR),
                 child: Icon(icon, color: color, size: 18),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(label,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.onBackground)),
+                    style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500)),
               ),
               if (trailing != null) trailing!,
               const SizedBox(width: 6),
@@ -630,16 +595,16 @@ class _PhotoOption extends StatelessWidget {
           width: 40, height: 40,
           decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10)),
+              borderRadius: AppRadius.smR),
           child: Icon(icon, color: color, size: 20),
         ),
         title: Text(label,
-            style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: color == AppColors.emergencyRed
-                    ? AppColors.emergencyRed
-                    : AppColors.onBackground)),
+            style: AppTextStyles.body.copyWith(
+              fontWeight: FontWeight.w600,
+              color: color == AppColors.emergencyRed
+                  ? AppColors.emergencyRed
+                  : AppColors.onBackground,
+            )),
         onTap: onTap,
       );
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../features/onboarding/presentation/screens/splash_screen.dart';
 import '../features/onboarding/presentation/screens/welcome_screen.dart';
@@ -22,6 +23,13 @@ import '../features/admin/presentation/screens/admin_add_asha_screen.dart';
 import '../features/admin/presentation/screens/admin_reports_screen.dart';
 import '../features/admin/presentation/screens/admin_profile_screen.dart';
 
+/// Route-typed transition vocabulary.
+///
+/// - `fadeIn`         (180ms) — peer-level swaps (bottom-nav siblings)
+/// - `rightToLeftWithFade` (260ms) — forward step in a guided flow
+/// - `downToUp`       (320ms) — modal/emergency sheets (gravity feel)
+/// - `zoom`           (280ms) — entering the voice/triage flow (mic-centric)
+/// - `fade`           (240ms) — splash → next (calm reveal)
 class AppRoutes {
   static const splash          = '/';
   static const welcome         = '/welcome';
@@ -47,29 +55,146 @@ class AppRoutes {
   static const adminReports    = '/admin/reports';
   static const adminProfile    = '/admin/profile';
 
+  // ── Duration tokens for transitions ────────────────────────────────────
+  static const _fast   = Duration(milliseconds: 180);
+  static const _medium = Duration(milliseconds: 260);
+  static const _calm   = Duration(milliseconds: 320);
+
   static final pages = [
-    GetPage(name: splash,         page: () => const SplashScreen()),
-    GetPage(name: welcome,        page: () => const WelcomeScreen()),
-    GetPage(name: language,       page: () => const LanguageScreen()),
-    GetPage(name: login,          page: () => const LoginScreen()),
-    GetPage(name: otp,            page: () => const OtpScreen()),
-    GetPage(name: home,           page: () => const HomeScreen()),
-    GetPage(name: selectCase,     page: () => const SelectCaseScreen()),
-    GetPage(name: caseConfirm,    page: () => const CaseConfirmScreen()),
-    GetPage(name: voiceTriage,    page: () => const VoiceTriageScreen()),
-    GetPage(name: dynamicTriage,  page: () => const DynamicTriageScreen()),
-    GetPage(name: triageResult,   page: () => const TriageResultScreen()),
-    GetPage(name: patientList,    page: () => const PatientListScreen()),
-    GetPage(name: addPatient,     page: () => const AddPatientScreen()),
-    GetPage(name: patientProfile, page: () => const PatientProfileScreen()),
-    GetPage(name: emergency,      page: () => const EmergencyScreen()),
-    GetPage(name: reports,        page: () => const ReportsScreen()),
-    GetPage(name: profile,        page: () => const ProfileScreen()),
-    // Admin
-    GetPage(name: adminDashboard, page: () => const AdminShell()),
-    GetPage(name: adminAshaList,  page: () => const AdminAshaListScreen()),
-    GetPage(name: adminAddAsha,   page: () => const AdminAddAshaScreen()),
-    GetPage(name: adminReports,   page: () => const AdminReportsScreen()),
-    GetPage(name: adminProfile,   page: () => const AdminProfileScreen()),
+    // Splash — calm reveal
+    GetPage(
+      name: splash,
+      page: () => const SplashScreen(),
+      transition: Transition.fade,
+      transitionDuration: Duration(milliseconds: 240),
+      curve: Curves.easeOut,
+    ),
+
+    // Onboarding flow — forward step
+    GetPage(
+      name: language,
+      page: () => const LanguageScreen(),
+      transition: Transition.rightToLeftWithFade,
+      transitionDuration: _medium,
+      curve: Curves.easeOutCubic,
+    ),
+    GetPage(
+      name: welcome,
+      page: () => const WelcomeScreen(),
+      transition: Transition.rightToLeftWithFade,
+      transitionDuration: _medium,
+      curve: Curves.easeOutCubic,
+    ),
+    GetPage(
+      name: login,
+      page: () => const LoginScreen(),
+      transition: Transition.rightToLeftWithFade,
+      transitionDuration: _medium,
+      curve: Curves.easeOutCubic,
+    ),
+    GetPage(
+      name: otp,
+      page: () => const OtpScreen(),
+      transition: Transition.rightToLeftWithFade,
+      transitionDuration: _medium,
+      curve: Curves.easeOutCubic,
+    ),
+
+    // Bottom-nav peers — instant fade (these swap via offAllNamed)
+    GetPage(
+      name: home,
+      page: () => const HomeScreen(),
+      transition: Transition.fadeIn,
+      transitionDuration: _fast,
+    ),
+    GetPage(
+      name: patientList,
+      page: () => const PatientListScreen(),
+      transition: Transition.fadeIn,
+      transitionDuration: _fast,
+    ),
+    GetPage(
+      name: reports,
+      page: () => const ReportsScreen(),
+      transition: Transition.fadeIn,
+      transitionDuration: _fast,
+    ),
+    GetPage(
+      name: profile,
+      page: () => const ProfileScreen(),
+      transition: Transition.fadeIn,
+      transitionDuration: _fast,
+    ),
+
+    // Triage entry — zoom (mic-centric, "enter the conversation")
+    GetPage(
+      name: selectCase,
+      page: () => const SelectCaseScreen(),
+      transition: Transition.zoom,
+      transitionDuration: Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    ),
+
+    // Triage continuation — forward step
+    GetPage(
+      name: caseConfirm,
+      page: () => const CaseConfirmScreen(),
+      transition: Transition.rightToLeftWithFade,
+      transitionDuration: _medium,
+    ),
+    GetPage(
+      name: voiceTriage,
+      page: () => const VoiceTriageScreen(),
+      transition: Transition.rightToLeftWithFade,
+      transitionDuration: _medium,
+    ),
+    GetPage(
+      name: dynamicTriage,
+      page: () => const DynamicTriageScreen(),
+      transition: Transition.rightToLeftWithFade,
+      transitionDuration: _medium,
+    ),
+    GetPage(
+      name: triageResult,
+      page: () => const TriageResultScreen(),
+      transition: Transition.fadeIn,
+      transitionDuration: _medium,
+    ),
+
+    // Patient detail screens — forward step
+    GetPage(
+      name: addPatient,
+      page: () => const AddPatientScreen(),
+      transition: Transition.rightToLeftWithFade,
+      transitionDuration: _medium,
+    ),
+    GetPage(
+      name: patientProfile,
+      page: () => const PatientProfileScreen(),
+      transition: Transition.rightToLeftWithFade,
+      transitionDuration: _medium,
+      curve: Curves.easeOutCubic,
+    ),
+
+    // Emergency — slides up like a sheet (gravity / urgency feel)
+    GetPage(
+      name: emergency,
+      page: () => const EmergencyScreen(),
+      transition: Transition.downToUp,
+      transitionDuration: _calm,
+      curve: Curves.easeOutCubic,
+    ),
+
+    // Admin — forward step
+    GetPage(name: adminDashboard, page: () => const AdminShell(),
+        transition: Transition.fadeIn, transitionDuration: _fast),
+    GetPage(name: adminAshaList,  page: () => const AdminAshaListScreen(),
+        transition: Transition.rightToLeftWithFade, transitionDuration: _medium),
+    GetPage(name: adminAddAsha,   page: () => const AdminAddAshaScreen(),
+        transition: Transition.rightToLeftWithFade, transitionDuration: _medium),
+    GetPage(name: adminReports,   page: () => const AdminReportsScreen(),
+        transition: Transition.rightToLeftWithFade, transitionDuration: _medium),
+    GetPage(name: adminProfile,   page: () => const AdminProfileScreen(),
+        transition: Transition.rightToLeftWithFade, transitionDuration: _medium),
   ];
 }

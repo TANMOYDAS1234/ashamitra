@@ -6,9 +6,15 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_gradients.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/utils/pdf_helper.dart';
+import '../../../../shared/components/app_header.dart';
+import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/patient_card.dart';
 import '../../../../shared/widgets/risk_badge.dart';
+import '../../../../shared/widgets/skeleton.dart';
 import '../../../../shared/components/bottom_nav.dart';
 import '../../controller/patient_controller.dart';
 import '../../data/models/patient_model.dart';
@@ -68,7 +74,8 @@ class _PatientListScreenState extends State<PatientListScreen> {
 
   Future<void> _downloadPdf() async {
     final list = _filtered;
-    final doc = pw.Document();
+    final theme = await PdfHelper.bengaliTheme();
+    final doc = pw.Document(theme: theme);
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
@@ -109,107 +116,65 @@ class _PatientListScreenState extends State<PatientListScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () => Get.back(),
-                      child: Container(
-                        width: 42, height: 42,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8)],
-                        ),
-                        child: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text('Patients',
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.onBackground)),
-                    ),
-                    GestureDetector(
-                      onTap: _downloadPdf,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.download_rounded, color: AppColors.primary, size: 16),
-                            SizedBox(width: 4),
-                            Text('PDF', style: TextStyle(fontSize: 13, color: AppColors.primary, fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () => Get.toNamed(AppRoutes.addPatient),
-                      child: Container(
-                        width: 40, height: 40,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                          boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 3))],
-                        ),
-                        child: const Icon(Icons.person_add_rounded, color: Colors.white, size: 20),
-                      ),
-                    ),
-                  ],
-                ),
+              AppHeader(
+                title: 'Patients',
+                actions: [
+                  HeaderActionPill(
+                    icon: Icons.download_rounded,
+                    label: 'PDF',
+                    onTap: _downloadPdf,
+                  ),
+                  HeaderActionCircle(
+                    icon: Icons.person_add_rounded,
+                    onTap: () => Get.toNamed(AppRoutes.addPatient),
+                    tooltip: 'Add patient',
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
                 child: TextField(
                   onChanged: (v) => setState(() => _searchQuery = v),
+                  style: AppTextStyles.body,
                   decoration: InputDecoration(
                     hintText: 'Search patient or village...',
-                    hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
                     prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primary, size: 22),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               SizedBox(
-                height: 38,
+                height: 40,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   itemCount: _filters.length,
                   itemBuilder: (_, i) {
                     final sel = i == _filterIndex;
-                    return GestureDetector(
-                      onTap: () => setState(() => _filterIndex = i),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        margin: const EdgeInsets.only(right: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: sel ? AppColors.primary : Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [BoxShadow(
-                            color: sel ? AppColors.primary.withOpacity(0.25) : Colors.black.withOpacity(0.04),
-                            blurRadius: 8, offset: const Offset(0, 2),
-                          )],
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Material(
+                        color: sel ? AppColors.primary : AppColors.surface,
+                        borderRadius: AppRadius.pillR,
+                        child: InkWell(
+                          onTap: () => setState(() => _filterIndex = i),
+                          borderRadius: AppRadius.pillR,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: sel ? AppColors.primary : AppColors.surface,
+                              borderRadius: AppRadius.pillR,
+                              boxShadow: sel ? AppShadows.tinted(AppColors.primary, strength: 2) : AppShadows.low,
+                            ),
+                            child: Text(
+                              _filters[i],
+                              style: AppTextStyles.label.copyWith(
+                                color: sel ? AppColors.onPrimary : AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
                         ),
-                        child: Text(_filters[i],
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: sel ? Colors.white : AppColors.textSecondary,
-                            )),
                       ),
                     );
                   },
@@ -219,21 +184,22 @@ class _PatientListScreenState extends State<PatientListScreen> {
               Expanded(
                 child: Obx(() {
                   if (_ctrl.isLoading.value && _ctrl.patients.isEmpty) {
-                    return const Center(
-                      child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 3),
+                    return SkeletonList(
+                      count: 5,
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      builder: (_) => const SkeletonPatientCard(),
                     );
                   }
                   final list = _filtered;
                   if (list.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.people_outline_rounded, size: 56, color: AppColors.textLight),
-                          const SizedBox(height: 12),
-                          Text('patient_empty'.tr,
-                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 14)),
-                        ],
+                    return EmptyState(
+                      icon: Icons.people_outline_rounded,
+                      title: 'patient_empty'.tr,
+                      subtitle: 'নতুন রোগী যোগ করুন বা ভয়েস ট্রায়াজ শুরু করুন',
+                      action: FilledButton.icon(
+                        onPressed: () => Get.toNamed(AppRoutes.addPatient),
+                        icon: const Icon(Icons.person_add_rounded, size: 18),
+                        label: const Text('রোগী যোগ করুন'),
                       ),
                     );
                   }
@@ -282,6 +248,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
                             village: p.village,
                             lastVisit: p.lastVisit,
                             riskLevel: p.riskFromOutcome,
+                            heroTag: p.id,
                             onTap: () => Get.toNamed(AppRoutes.patientProfile, arguments: p.toJson()),
                             onCallTap: p.mobile.isNotEmpty
                                 ? () => launchUrl(Uri.parse('tel:${p.mobile}'))

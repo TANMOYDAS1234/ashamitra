@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_text_styles.dart';
 
 /// Full-detail bottom sheet for a single triage report. Shared by the admin
 /// Reports tab and the worker-detail sheet, so an admin can drill into any
@@ -22,9 +24,9 @@ void showAdminReportDetail(BuildContext context, Map<String, dynamic> r) {
       maxChildSize: 0.92,
       minChildSize: 0.4,
       builder: (_, scrollCtrl) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
         ),
         child: ListView(
           controller: scrollCtrl,
@@ -48,20 +50,16 @@ void showAdminReportDetail(BuildContext context, Map<String, dynamic> r) {
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                       color: color.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10)),
+                      borderRadius: AppRadius.smR),
                   child: Text(band,
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: color)),
+                      style: AppTextStyles.label.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.w800,
+                      )),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(r['caseLabel']?.toString() ?? '',
-                      style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.onBackground)),
+                  child: Text(r['caseLabel']?.toString() ?? '', style: AppTextStyles.h3),
                 ),
               ],
             ),
@@ -81,11 +79,10 @@ void showAdminReportDetail(BuildContext context, Map<String, dynamic> r) {
               _DetailRow('Situation', r['situation'].toString()),
             if ((r['dangerSigns'] as List?)?.isNotEmpty == true) ...[
               const SizedBox(height: 8),
-              const Text('Danger Signs',
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textSecondary)),
+              Text('Danger Signs',
+                  style: AppTextStyles.caption.copyWith(
+                    fontWeight: FontWeight.w700,
+                  )),
               const SizedBox(height: 6),
               Wrap(
                 spacing: 6,
@@ -97,11 +94,11 @@ void showAdminReportDetail(BuildContext context, Map<String, dynamic> r) {
                           decoration: BoxDecoration(
                               color: AppColors.emergencyRed
                                   .withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(8)),
+                              borderRadius: AppRadius.smR),
                           child: Text(s.toString(),
-                              style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.emergencyRed)),
+                              style: AppTextStyles.caption.copyWith(
+                                color: AppColors.emergencyRed,
+                              )),
                         ))
                     .toList(),
               ),
@@ -110,8 +107,7 @@ void showAdminReportDetail(BuildContext context, Map<String, dynamic> r) {
             const SizedBox(height: 8),
             Text(
               _fmtDate(r['createdAt']?.toString() ?? ''),
-              style: const TextStyle(
-                  fontSize: 11, color: AppColors.textSecondary),
+              style: AppTextStyles.caption,
             ),
           ],
         ),
@@ -135,11 +131,10 @@ List<Widget> _qaSection(dynamic raw) {
   if (pairs.isEmpty) return const [];
   return [
     const SizedBox(height: 12),
-    const Text('Assessment Q&A',
-        style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textSecondary)),
+    Text('Assessment Q&A',
+        style: AppTextStyles.caption.copyWith(
+          fontWeight: FontWeight.w700,
+        )),
     const SizedBox(height: 6),
     for (final (q, a) in pairs)
       Padding(
@@ -148,14 +143,8 @@ List<Widget> _qaSection(dynamic raw) {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (q.isNotEmpty)
-              Text(q,
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary)),
-            Text(a.isNotEmpty ? a : '—',
-                style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.onBackground)),
+              Text(q, style: AppTextStyles.caption),
+            Text(a.isNotEmpty ? a : '—', style: AppTextStyles.label),
           ],
         ),
       ),
@@ -186,17 +175,16 @@ class _DetailRow extends StatelessWidget {
           SizedBox(
             width: 100,
             child: Text(label,
-                style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary)),
+                style: AppTextStyles.caption.copyWith(
+                  fontWeight: FontWeight.w600,
+                )),
           ),
           Expanded(
             child: Text(value,
-                style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.onBackground)),
+                style: AppTextStyles.label.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.onBackground,
+                )),
           ),
         ],
       ),

@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter analyze *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" https://api.github.com/repos/TANMOYDAS1234/ASHAmitra-backend)",
+      "Bash(curl -s https://api.github.com/repos/TANMOYDAS1234/ASHAmitra-backend)",
+      "Bash(git rm *)",
+      "Bash(git remote *)",
+      "Bash(git fetch *)",
+      "Bash(flutter test *)",
+      "Bash(flutter devices *)",
+      "Bash(flutter install *)",
+      "Bash(flutter build *)"
+    ]
+  }
+}

@@ -4,6 +4,9 @@ import '../../../../app/routes.dart';
 import '../../../../core/services/language_controller.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_gradients.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/widgets/app_button.dart';
 
 class LanguageScreen extends StatelessWidget {
@@ -36,18 +39,11 @@ class LanguageScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 60),
-                Text(
-                  'select_language_subtitle'.tr,
-                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                ),
+                Text('select_language_subtitle'.tr, style: AppTextStyles.bodySm),
                 const SizedBox(height: 8),
                 Text(
                   'select_language'.tr,
-                  style: const TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.onBackground,
-                  ),
+                  style: AppTextStyles.display.copyWith(fontSize: 30),
                 ),
                 const SizedBox(height: 40),
                 Obx(() => Column(
@@ -56,79 +52,71 @@ class LanguageScreen extends StatelessWidget {
                         final isSelected = i == lang.selectedIndex.value;
                         final accent = _langColors[i];
                         final abbr = _langAbbr[i];
-                        return GestureDetector(
-                          onTap: () => lang.setLanguage(i),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            margin: const EdgeInsets.only(bottom: 16),
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                            decoration: BoxDecoration(
-                              color: isSelected ? accent : Colors.white,
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: isSelected ? accent : const Color(0xFFE0E7FF),
-                                width: isSelected ? 2 : 1,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: isSelected
-                                      ? accent.withOpacity(0.28)
-                                      : Colors.black.withOpacity(0.04),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 4),
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 14),
+                          child: Material(
+                            color: isSelected ? accent : AppColors.surface,
+                            borderRadius: AppRadius.xlR,
+                            child: InkWell(
+                              onTap: () => lang.setLanguage(i),
+                              borderRadius: AppRadius.xlR,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                                decoration: BoxDecoration(
+                                  color: isSelected ? accent : AppColors.surface,
+                                  borderRadius: AppRadius.xlR,
+                                  boxShadow: isSelected
+                                      ? AppShadows.tinted(accent, strength: 2)
+                                      : AppShadows.low,
                                 ),
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? Colors.white.withOpacity(0.2)
-                                        : accent.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      abbr,
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: isSelected ? Colors.white : accent,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                child: Row(
                                   children: [
-                                    Text(
-                                      name,
-                                      style: TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.w600,
-                                        color: isSelected ? Colors.white : AppColors.onBackground,
-                                      ),
-                                    ),
-                                    Text(
-                                      subName,
-                                      style: TextStyle(
-                                        fontSize: 13,
+                                    Container(
+                                      width: 50,
+                                      height: 50,
+                                      decoration: BoxDecoration(
                                         color: isSelected
-                                            ? Colors.white.withOpacity(0.75)
-                                            : AppColors.textSecondary,
+                                            ? Colors.white.withValues(alpha: 0.20)
+                                            : accent.withValues(alpha: 0.10),
+                                        borderRadius: AppRadius.mdR,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          abbr,
+                                          style: AppTextStyles.h3.copyWith(
+                                            color: isSelected ? Colors.white : accent,
+                                          ),
+                                        ),
                                       ),
                                     ),
+                                    const SizedBox(width: 16),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          name,
+                                          style: AppTextStyles.h2.copyWith(
+                                            color: isSelected ? Colors.white : AppColors.onBackground,
+                                          ),
+                                        ),
+                                        Text(
+                                          subName,
+                                          style: AppTextStyles.bodySm.copyWith(
+                                            color: isSelected
+                                                ? Colors.white.withValues(alpha: 0.80)
+                                                : AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const Spacer(),
+                                    if (isSelected)
+                                      const Icon(Icons.check_circle_rounded,
+                                          color: Colors.white, size: 24),
                                   ],
                                 ),
-                                const Spacer(),
-                                if (isSelected)
-                                  const Icon(Icons.check_circle_rounded,
-                                      color: Colors.white, size: 24),
-                              ],
+                              ),
                             ),
                           ),
                         );

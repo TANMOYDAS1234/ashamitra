@@ -22,12 +22,20 @@ class AdminController extends GetxController {
   final filterMode = 'all'.obs;
   final filterDate = Rxn<DateTime>();
 
+  // Location filter dimensions — populated from /api/admin/locations.
+  final districts          = <String>[].obs;
+  final blocks             = <String>[].obs;
+  final selectedWorkerId   = Rxn<String>();   // null = all workers
+  final selectedDistrict   = Rxn<String>();   // null = all districts
+  final selectedBlock      = Rxn<String>();   // null = all blocks
+
   @override
   void onInit() {
     super.onInit();
     loadStats();
     loadAshaWorkers();
     loadReports();
+    loadLocations();
   }
 
   void _handleUnauth() {
@@ -174,10 +182,13 @@ class AdminController extends GetxController {
     isLoading.value = true;
     try {
       final res = await ApiService.getAdminReports(
-        band:  band,
-        date:  date  != null ? DateFormat('yyyy-MM-dd').format(date)  : null,
-        month: month,
-        year:  year,
+        band:     band,
+        date:     date != null ? DateFormat('yyyy-MM-dd').format(date) : null,
+        month:    month,
+        year:     year,
+        worker:   selectedWorkerId.value,
+        district: selectedDistrict.value,
+        block:    selectedBlock.value,
       );
       if (res['success'] == true) {
         final list = (res['data'] as List)
@@ -195,6 +206,44 @@ class AdminController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  /// Loads district + block distinct lists for the filter dropdowns.
+  Future<void> loadLocations() async {
+    try {
+      final res = await ApiService.getAdminLocations();
+      if (res['success'] == true) {
+        final data = res['data'] as Map<String, dynamic>;
+        districts.value = ((data['districts'] as List?) ?? []).map((e) => e.toString()).toList();
+        blocks.value    = ((data['blocks']    as List?) ?? []).map((e) => e.toString()).toList();
+      }
+    } on UnauthorizedException {
+      _handleUnauth();
+    } catch (_) {}
+  }
+
+  /// Re-runs the report query with the currently selected band/date AND
+  /// the worker/district/block selections. Called by the new filter UI.
+  Future<void> applyLocationFilters() async {
+    // Re-fire the current band/date filter — keeps both filter axes in sync.
+    final mode = filterMode.value;
+    final date = filterDate.value;
+    switch (mode) {
+      case 'red':    return loadReports(band: 'RED');
+      case 'yellow': return loadReports(band: 'YELLOW');
+      case 'green':  return loadReports(band: 'GREEN');
+      case 'day':    if (date != null) return loadReports(date: date); break;
+      case 'month':  if (date != null) return loadReports(month: DateFormat('yyyy-MM').format(date)); break;
+      case 'year':   if (date != null) return loadReports(year: date.year.toString()); break;
+    }
+    return loadReports();
+  }
+
+  void clearLocationFilters() {
+    selectedWorkerId.value = null;
+    selectedDistrict.value = null;
+    selectedBlock.value    = null;
+    applyLocationFilters();
   }
 
   void setFilter(String mode, {DateTime? date}) {

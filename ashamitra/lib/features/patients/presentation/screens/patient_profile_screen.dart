@@ -3,6 +3,10 @@ import 'package:get/get.dart';
 import '../../../../app/routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_gradients.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/components/app_header.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/risk_badge.dart';
 import '../../controller/patient_controller.dart';
@@ -100,65 +104,43 @@ class PatientProfileScreen extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              // ── Header ────────────────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () => Get.back(),
-                      child: Container(
-                        width: 42, height: 42,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
-                              blurRadius: 8)],
-                        ),
-                        child: const Icon(Icons.arrow_back_ios_new_rounded,
-                            size: 18),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text('Patient Profile',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold,
-                            color: AppColors.onBackground)),
-                  ],
-                ),
-              ),
+              const AppHeader(title: 'Patient Profile'),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
                   child: Column(
                     children: [
                       // ── Patient header card ──────────────────────────
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.06),
-                              blurRadius: 16, offset: const Offset(0, 4))],
+                          color: AppColors.surface,
+                          borderRadius: AppRadius.xlR,
+                          boxShadow: AppShadows.mid,
                         ),
                         child: Row(
                           children: [
-                            Container(
-                              width: 60, height: 60,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: LinearGradient(
-                                  colors: [AppColors.primary, AppColors.purple],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
+                            Hero(
+                              tag: 'patient_avatar_$patientId',
+                              child: Container(
+                                width: 64, height: 64,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: LinearGradient(
+                                    colors: [AppColors.primary, AppColors.purple],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
                                 ),
-                              ),
-                              child: Center(
-                                child: Text(initial,
-                                    style: const TextStyle(color: Colors.white,
-                                        fontSize: 26,
-                                        fontWeight: FontWeight.bold)),
+                                child: Center(
+                                  child: Text(
+                                    initial,
+                                    style: AppTextStyles.display.copyWith(
+                                      fontSize: 26,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 16),
@@ -166,34 +148,33 @@ class PatientProfileScreen extends StatelessWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(name,
+                                  Text(
+                                    name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppTextStyles.h2,
+                                  ),
+                                  if (village.isNotEmpty && village != '—')
+                                    Text(
+                                      'Village: $village',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.onBackground)),
-                                  if (village.isNotEmpty && village != '—')
-                                    Text('Village: $village',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontSize: 13,
-                                            color: AppColors.textSecondary)),
+                                      style: AppTextStyles.bodySm,
+                                    ),
                                   if (mobile.isNotEmpty)
                                     Padding(
                                       padding: const EdgeInsets.only(top: 2),
                                       child: Row(
                                         children: [
                                           const Icon(Icons.phone_rounded,
-                                              size: 12,
+                                              size: 13,
                                               color: AppColors.textSecondary),
                                           const SizedBox(width: 4),
-                                          Text(mobile,
-                                              style: const TextStyle(fontSize: 13,
-                                                  color: AppColors.textSecondary)),
+                                          Text(mobile, style: AppTextStyles.bodySm),
                                         ],
                                       ),
                                     ),
-                                  const SizedBox(height: 6),
+                                  const SizedBox(height: 8),
                                   RiskBadge(level: risk),
                                 ],
                               ),
@@ -290,9 +271,7 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Align(
         alignment: Alignment.centerLeft,
-        child: Text(text,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
-                color: AppColors.onBackground)),
+        child: Text(text, style: AppTextStyles.h3),
       );
 }
 
@@ -611,26 +590,26 @@ class _InfoCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [BoxShadow(
-              color: color.withValues(alpha: 0.08),
-              blurRadius: 10, offset: const Offset(0, 3))],
+          color: AppColors.surface,
+          borderRadius: AppRadius.lgR,
+          boxShadow: AppShadows.tinted(color),
         ),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(height: 5),
-            Text(value,
-                maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-                    color: AppColors.onBackground),
-                textAlign: TextAlign.center),
-            Text(label,
-                maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 10,
-                    color: AppColors.textSecondary),
-                textAlign: TextAlign.center),
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              maxLines: 1, overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.label,
+            ),
+            Text(
+              label,
+              maxLines: 1, overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.caption,
+            ),
           ],
         ),
       ),

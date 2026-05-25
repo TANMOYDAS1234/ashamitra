@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
+// ignore: unused_import
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../../app/routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_gradients.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/services/gemini_triage_service.dart';
 import '../../../../core/services/tts_service.dart';
 import '../../../../shared/widgets/voice_orb.dart';
@@ -251,15 +255,22 @@ class _DynamicTriageScreenState extends State<DynamicTriageScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                 child: Row(
                   children: [
-                    GestureDetector(
-                      onTap: () { _tts.stop(); _stt.stop(); Get.back(); },
-                      child: Container(
-                        width: 42, height: 42,
-                        decoration: BoxDecoration(
-                          color: Colors.white, shape: BoxShape.circle,
-                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8)],
+                    Material(
+                      color: AppColors.surface,
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        onTap: () { _tts.stop(); _stt.stop(); Get.back(); },
+                        customBorder: const CircleBorder(),
+                        child: Ink(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            shape: BoxShape.circle,
+                            boxShadow: AppShadows.low,
+                          ),
+                          child: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
                         ),
-                        child: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
                       ),
                     ),
                     const SizedBox(width: 14),
@@ -267,48 +278,54 @@ class _DynamicTriageScreenState extends State<DynamicTriageScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(_caseTitle,
-                              maxLines: 1, overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                          Text(
+                            _caseTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.labelLg.copyWith(color: AppColors.primary),
+                          ),
                           Text(
                             _collectingSituation
                                 ? 'পরিস্থিতি বর্ণনা করুন'
                                 : total == 0
                                     ? 'প্রশ্ন তৈরি হচ্ছে...'
                                     : 'প্রশ্ন ${_currentIndex + 1} / $total',
-                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            style: AppTextStyles.caption,
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 6),
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
                             child: LinearProgressIndicator(
                               value: _collectingSituation ? 0.0 : progress,
-                              backgroundColor: const Color(0xFFE0E7FF),
+                              backgroundColor: AppColors.primarySoft,
                               color: AppColors.primary,
-                              minHeight: 5,
+                              minHeight: 6,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    // Replay button
-                    GestureDetector(
-                      onTap: () {
-                        if (_collectingSituation) {
-                          _speak('রোগীর পরিস্থিতি বলুন।');
-                        } else if (!_loadingQuestions && _currentQuestion.isNotEmpty) {
-                          _speak(_currentQuestion);
-                        }
-                      },
-                      child: Container(
-                        width: 42, height: 42,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          _isSpeaking ? Icons.volume_up_rounded : Icons.replay_rounded,
-                          size: 20, color: AppColors.primary,
+                    const SizedBox(width: 10),
+                    Material(
+                      color: AppColors.primary.withValues(alpha: 0.10),
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        onTap: () {
+                          if (_collectingSituation) {
+                            _speak('রোগীর পরিস্থিতি বলুন।');
+                          } else if (!_loadingQuestions && _currentQuestion.isNotEmpty) {
+                            _speak(_currentQuestion);
+                          }
+                        },
+                        customBorder: const CircleBorder(),
+                        child: SizedBox(
+                          width: 44,
+                          height: 44,
+                          child: Icon(
+                            _isSpeaking ? Icons.volume_up_rounded : Icons.replay_rounded,
+                            size: 20,
+                            color: AppColors.primary,
+                          ),
                         ),
                       ),
                     ),
@@ -333,95 +350,92 @@ class _DynamicTriageScreenState extends State<DynamicTriageScreen> {
                                   const Icon(Icons.record_voice_over_rounded,
                                       size: 36, color: AppColors.primary),
                                   const SizedBox(height: 12),
-                                  const Text('রোগীর পরিস্থিতি বলুন',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
-                                          color: AppColors.onBackground)),
-                                  const SizedBox(height: 8),
-                                  const Text(
-                                    'মাইক চাপুন এবং রোগীর সমস্যা বিস্তারিত বলুন। '
-                                    'যেমন: বয়স, লক্ষণ, কতদিন ধরে হচ্ছে ইত্যাদি।',
+                                  Text(
+                                    'রোগীর পরিস্থিতি বলুন',
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(fontSize: 13,
-                                        color: AppColors.textSecondary, height: 1.5),
+                                    style: AppTextStyles.h2,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'মাইক চাপুন এবং রোগীর সমস্যা বিস্তারিত বলুন। যেমন: বয়স, লক্ষণ, কতদিন ধরে হচ্ছে ইত্যাদি।',
+                                    textAlign: TextAlign.center,
+                                    style: AppTextStyles.bodySm,
                                   ),
                                 ],
                               )
                             : _loadingQuestions
-                                ? const Center(
+                                ? Center(
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        CircularProgressIndicator(
+                                        const CircularProgressIndicator(
                                             color: AppColors.primary, strokeWidth: 2),
-                                        SizedBox(height: 10),
-                                        Text('প্রশ্ন তৈরি হচ্ছে...',
-                                            style: TextStyle(fontSize: 13,
-                                                color: AppColors.textSecondary)),
+                                        const SizedBox(height: 10),
+                                        Text('প্রশ্ন তৈরি হচ্ছে...', style: AppTextStyles.bodySm),
                                       ],
                                     ),
                                   )
-                                : Text(_currentQuestion,
+                                : Text(
+                                    _currentQuestion,
                                     textAlign: TextAlign.center,
-                                    style: const TextStyle(fontSize: 18,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.onBackground, height: 1.5)),
+                                    style: AppTextStyles.h2,
+                                  ),
                       ),
                       const SizedBox(height: 20),
 
                       // ── Mic toggle ───────────────────────────
-                      GestureDetector(
-                        onTap: _loadingQuestions ? null : _toggleMic,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: 72, height: 72,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: _isListening
-                                  ? [AppColors.safeGreen, const Color(0xFF16A34A)]
-                                  : [AppColors.primary, AppColors.purple],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (_isListening ? AppColors.safeGreen : AppColors.primary)
-                                    .withOpacity(0.4),
-                                blurRadius: 20, offset: const Offset(0, 6),
+                      Material(
+                        shape: const CircleBorder(),
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _loadingQuestions ? null : _toggleMic,
+                          customBorder: const CircleBorder(),
+                          child: Ink(
+                            width: 76,
+                            height: 76,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: _isListening
+                                    ? [AppColors.safeGreen, const Color(0xFF16A34A)]
+                                    : [AppColors.primary, AppColors.purple],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
                               ),
-                            ],
-                          ),
-                          child: Icon(
-                            _isListening ? Icons.stop_rounded : Icons.mic_rounded,
-                            color: Colors.white, size: 32,
+                              boxShadow: AppShadows.tinted(
+                                _isListening ? AppColors.safeGreen : AppColors.primary,
+                                strength: 2,
+                              ),
+                            ),
+                            child: Icon(
+                              _isListening ? Icons.stop_rounded : Icons.mic_rounded,
+                              color: Colors.white, size: 32,
+                            ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       Text(
                         _isListening
-                            ? '🔴 শুনছি — থামাতে আবার চাপুন'
+                            ? 'শুনছি — থামাতে আবার চাপুন'
                             : _collectingSituation
                                 ? 'মাইক চাপুন পরিস্থিতি বলতে'
                                 : 'মাইক চাপুন উত্তর দিতে',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
+                        style: AppTextStyles.caption.copyWith(
                           color: _isListening ? AppColors.safeGreen : AppColors.textSecondary,
-                          fontWeight: _isListening ? FontWeight.w600 : FontWeight.normal,
+                          fontWeight: _isListening ? FontWeight.w700 : FontWeight.w500,
                         ),
                       ),
 
                       if (_isListening) ...[
                         const SizedBox(height: 4),
-                        Text('⏱️ ${_remainingSeconds}s',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: _remainingSeconds < 15
-                                  ? AppColors.emergencyRed
-                                  : AppColors.textSecondary,
-                            )),
+                        Text(
+                          '${_remainingSeconds}s',
+                          style: AppTextStyles.caption.copyWith(
+                            color: _remainingSeconds < 15 ? AppColors.emergencyRed : AppColors.textSecondary,
+                          ),
+                        ),
                       ],
 
                       // ── Live transcript ──────────────────────
@@ -431,25 +445,23 @@ class _DynamicTriageScreenState extends State<DynamicTriageScreen> {
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.06),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                            color: AppColors.primarySoft,
+                            borderRadius: AppRadius.mdR,
+                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.20)),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('"$_transcript"',
-                                  style: const TextStyle(fontSize: 14,
-                                      color: AppColors.onBackground, fontWeight: FontWeight.w500)),
+                              Text('"$_transcript"', style: AppTextStyles.body),
                               if (_confidence > 0) ...[
                                 const SizedBox(height: 4),
-                                Text('${(_confidence * 100).toStringAsFixed(0)}% নিশ্চিত',
-                                    style: TextStyle(
-                                      fontSize: 10, fontWeight: FontWeight.w600,
-                                      color: _confidence > 0.7
-                                          ? AppColors.safeGreen
-                                          : AppColors.warningYellow,
-                                    )),
+                                Text(
+                                  '${(_confidence * 100).toStringAsFixed(0)}% নিশ্চিত',
+                                  style: AppTextStyles.caption.copyWith(
+                                    color: _confidence > 0.7 ? AppColors.safeGreen : AppColors.warningYellow,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
                               ],
                             ],
                           ),
@@ -461,32 +473,24 @@ class _DynamicTriageScreenState extends State<DynamicTriageScreen> {
                         const SizedBox(height: 16),
                         Align(
                           alignment: Alignment.centerLeft,
-                          child: Text('আগের উত্তর',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-                                  color: AppColors.primary.withOpacity(0.7), letterSpacing: 0.5)),
+                          child: Text('আগের উত্তর', style: AppTextStyles.overline),
                         ),
                         const SizedBox(height: 6),
                         ..._history.reversed.take(3).map((h) => Padding(
                               padding: const EdgeInsets.only(bottom: 6),
                               child: Container(
                                 width: double.infinity,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.7),
-                                  borderRadius: BorderRadius.circular(10),
+                                  color: AppColors.surface.withValues(alpha: 0.70),
+                                  borderRadius: AppRadius.mdR,
                                 ),
                                 child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Expanded(
-                                      child: Text(h['q'] ?? '',
-                                          style: const TextStyle(fontSize: 11,
-                                              color: AppColors.textSecondary))),
+                                    Expanded(child: Text(h['q'] ?? '', style: AppTextStyles.bodySm)),
                                     const SizedBox(width: 8),
-                                    Text(h['a'] ?? '',
-                                        style: const TextStyle(fontSize: 11,
-                                            fontWeight: FontWeight.w700,
-                                            color: AppColors.onBackground)),
+                                    Text(h['a'] ?? '', style: AppTextStyles.label),
                                   ],
                                 ),
                               ),
@@ -502,40 +506,47 @@ class _DynamicTriageScreenState extends State<DynamicTriageScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                   child: Wrap(
-                    spacing: 8, runSpacing: 8,
+                    spacing: 10, runSpacing: 10,
                     alignment: WrapAlignment.center,
                     children: _currentOptions.map((opt) {
                       final isYes = opt == 'হ্যাঁ';
                       final isNo = opt == 'না';
+                      final bg = isYes
+                          ? AppColors.emergencyRed
+                          : isNo
+                              ? AppColors.safeGreen
+                              : AppColors.surface;
+                      final fg = (isYes || isNo) ? AppColors.onPrimary : AppColors.textSecondary;
                       return SizedBox(
                         width: (MediaQuery.of(context).size.width - 56) /
                             _currentOptions.length.clamp(1, 3),
-                        child: ElevatedButton(
-                          onPressed: () => _submitAnswer(opt),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isYes
-                                ? AppColors.emergencyRed
-                                : isNo
-                                    ? AppColors.safeGreen
-                                    : Colors.white,
-                            foregroundColor:
-                                (isYes || isNo) ? Colors.white : AppColors.textSecondary,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(vertical: 13),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(
-                                  color: (isYes || isNo)
-                                      ? Colors.transparent
-                                      : const Color(0xFFE0E7FF)),
+                        child: Material(
+                          color: bg,
+                          borderRadius: AppRadius.mdR,
+                          child: InkWell(
+                            onTap: () => _submitAnswer(opt),
+                            borderRadius: AppRadius.mdR,
+                            child: Ink(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              decoration: BoxDecoration(
+                                color: bg,
+                                borderRadius: AppRadius.mdR,
+                                border: (isYes || isNo)
+                                    ? null
+                                    : Border.all(color: AppColors.cardBorder),
+                                boxShadow: (isYes || isNo)
+                                    ? AppShadows.tinted(bg, strength: 2)
+                                    : AppShadows.low,
+                              ),
+                              child: Text(
+                                opt,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: AppTextStyles.label.copyWith(color: fg),
+                              ),
                             ),
                           ),
-                          child: Text(opt,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w600, fontSize: 13)),
                         ),
                       );
                     }).toList(),

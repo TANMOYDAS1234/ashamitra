@@ -7,7 +7,7 @@ class AuthRepository {
   final AuthLocalDs _local;
   AuthRepository(this._remote, this._local);
 
-  Future<void> login(String phone) => _remote.login(phone);
+  Future<void> sendOtp(String phone) => _remote.sendOtp(phone);
 
   Future<UserModel> verifyOtp(String phone, String otp) async {
     final data = await _remote.verifyOtp(phone, otp);

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_radius.dart';
+import '../../core/theme/app_shadows.dart';
+import '../../core/theme/app_text_styles.dart';
 import 'risk_badge.dart';
 
 class PatientCard extends StatelessWidget {
@@ -11,6 +15,10 @@ class PatientCard extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onCallTap;
 
+  /// Tag for the Hero animation between this card's avatar and the patient
+  /// profile screen's big gradient avatar. Pass the patient id.
+  final String? heroTag;
+
   const PatientCard({
     super.key,
     required this.name,
@@ -20,80 +28,96 @@ class PatientCard extends StatelessWidget {
     this.riskLevel = RiskLevel.safe,
     this.onTap,
     this.onCallTap,
+    this.heroTag,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withOpacity(0.06),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
-            ),
-          ],
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final avatar = Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.primary.withValues(alpha: 0.10),
+      ),
+      child: Center(
+        child: Text(
+          initial,
+          style: AppTextStyles.h3.copyWith(color: AppColors.primary),
         ),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: AppColors.primary.withOpacity(0.1),
-              child: Text(
-                name.isNotEmpty ? name[0].toUpperCase() : '?',
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
+      ),
+    );
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppRadius.lgR,
+        boxShadow: AppShadows.tinted(AppColors.primary),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: AppRadius.lgR,
+        child: InkWell(
+          onTap: onTap == null
+              ? null
+              : () {
+                  HapticFeedback.selectionClick();
+                  onTap!();
+                },
+          borderRadius: AppRadius.lgR,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                if (heroTag != null)
+                  Hero(tag: 'patient_avatar_$heroTag', child: avatar)
+                else
+                  avatar,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, style: AppTextStyles.labelLg),
+                      const SizedBox(height: 3),
+                      Text(
+                        '$caseType · $village',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.bodySm,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        lastVisit,
+                        style: AppTextStyles.caption.copyWith(color: AppColors.textLight),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(name,
-                      style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF1E1B4B))),
-                  const SizedBox(height: 3),
-                  Text(
-                    '$caseType · $village',
-                    style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+                if (onCallTap != null) ...[
+                  const SizedBox(width: 4),
+                  Material(
+                    color: AppColors.safeGreen.withValues(alpha: 0.12),
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      onTap: onCallTap,
+                      customBorder: const CircleBorder(),
+                      child: const SizedBox(
+                        width: 36,
+                        height: 36,
+                        child: Icon(Icons.phone_rounded,
+                            size: 18, color: AppColors.safeGreen),
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    lastVisit,
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
-                  ),
+                  const SizedBox(width: 4),
                 ],
-              ),
+                RiskBadge(level: riskLevel),
+              ],
             ),
-            if (onCallTap != null) ...[
-              GestureDetector(
-                onTap: onCallTap,
-                child: Container(
-                  width: 34, height: 34,
-                  margin: const EdgeInsets.only(right: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.safeGreen.withOpacity(0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.phone_rounded,
-                      size: 16, color: AppColors.safeGreen),
-                ),
-              ),
-            ],
-            RiskBadge(level: riskLevel),
-          ],
+          ),
         ),
       ),
     );

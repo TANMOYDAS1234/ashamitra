@@ -49,7 +49,7 @@ class AuthForm extends StatelessWidget {
                     end: Alignment.bottomRight,
                   ),
                   boxShadow: [
-                    BoxShadow(color: AppColors.primary.withOpacity(0.35),
+                    BoxShadow(color: AppColors.primary.withValues(alpha: 0.35),
                         blurRadius: 20, offset: const Offset(0, 6)),
                   ],
                 ),
@@ -79,9 +79,9 @@ class AuthForm extends StatelessWidget {
                     return Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: c.color.withOpacity(0.1),
+                        color: c.color.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: c.color.withOpacity(0.3)),
+                        border: Border.all(color: c.color.withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,

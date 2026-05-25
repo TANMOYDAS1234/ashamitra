@@ -3,6 +3,10 @@ import 'package:get/get.dart';
 import '../../../../app/routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_gradients.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/components/app_header.dart';
 import '../../../../shared/widgets/app_input.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../core/utils/validators.dart';
@@ -90,29 +94,8 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () => Get.back(),
-                      child: Container(
-                        width: 42, height: 42,
-                        decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle,
-                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8)]),
-                        child: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text('Add Patient',
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.onBackground)),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
+              const AppHeader(title: 'Add Patient'),
+              const SizedBox(height: 12),
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -144,21 +127,15 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text('Gender',
-                                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
+                                  Text('Gender', style: AppTextStyles.label),
                                   const SizedBox(height: 6),
                                   DropdownButtonFormField<String>(
-                                    value: _gender,
+                                    initialValue: _gender,
                                     onChanged: (v) => setState(() => _gender = v!),
-                                    decoration: InputDecoration(
-                                      filled: true,
-                                      fillColor: Colors.white.withOpacity(0.9),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE0E7FF))),
-                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE0E7FF))),
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                                    ),
+                                    style: AppTextStyles.body,
+                                    decoration: const InputDecoration(),
                                     items: ['Female', 'Male', 'Other']
-                                        .map((g) => DropdownMenuItem(value: g, child: Text(g, style: const TextStyle(fontSize: 14))))
+                                        .map((g) => DropdownMenuItem(value: g, child: Text(g)))
                                         .toList(),
                                   ),
                                 ],
@@ -187,30 +164,36 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Case Type',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
-                            const SizedBox(height: 8),
+                            Text('Case Type', style: AppTextStyles.label),
+                            const SizedBox(height: 10),
                             Wrap(
                               spacing: 10,
                               runSpacing: 8,
                               children: ['Pregnancy', 'Newborn', 'Child', 'Other'].map((c) {
                                 final sel = c == _caseType;
-                                return GestureDetector(
-                                  onTap: () => setState(() => _caseType = c),
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 150),
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: sel ? AppColors.primary : Colors.white,
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(color: sel ? AppColors.primary : const Color(0xFFE0E7FF)),
-                                      boxShadow: [if (sel) BoxShadow(color: AppColors.primary.withOpacity(0.25), blurRadius: 8, offset: const Offset(0, 2))],
+                                return Material(
+                                  color: sel ? AppColors.primary : AppColors.surface,
+                                  borderRadius: AppRadius.pillR,
+                                  child: InkWell(
+                                    onTap: () => setState(() => _caseType = c),
+                                    borderRadius: AppRadius.pillR,
+                                    child: AnimatedContainer(
+                                      duration: const Duration(milliseconds: 180),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                                      decoration: BoxDecoration(
+                                        color: sel ? AppColors.primary : AppColors.surface,
+                                        borderRadius: AppRadius.pillR,
+                                        boxShadow: sel
+                                            ? AppShadows.tinted(AppColors.primary, strength: 2)
+                                            : AppShadows.low,
+                                      ),
+                                      child: Text(
+                                        c,
+                                        style: AppTextStyles.label.copyWith(
+                                          color: sel ? AppColors.onPrimary : AppColors.textSecondary,
+                                        ),
+                                      ),
                                     ),
-                                    child: Text(c,
-                                        style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: sel ? Colors.white : AppColors.textSecondary)),
                                   ),
                                 );
                               }).toList(),

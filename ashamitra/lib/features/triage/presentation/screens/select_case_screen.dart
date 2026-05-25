@@ -4,8 +4,12 @@ import 'package:speech_to_text/speech_to_text.dart';
 import '../../../../app/routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_gradients.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/services/case_detection_service.dart';
 import '../../../../core/services/tts_service.dart';
+import '../../../../shared/components/app_header.dart';
 import '../../data/models/triage_case_model.dart';
 
 class SelectCaseScreen extends StatefulWidget {
@@ -159,130 +163,56 @@ class _SelectCaseScreenState extends State<SelectCaseScreen> {
       body: Container(
         decoration: const BoxDecoration(gradient: AppGradients.background),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () => Get.back(),
-                      child: Container(
-                        width: 42, height: 42,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8)],
-                        ),
-                        child: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('select_case'.tr,
-                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.onBackground)),
-                        Text('select_case_subtitle'.tr,
-                            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // ── Mic toggle card ──────────────────────────
-                GestureDetector(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppHeader(
+                title: 'select_case'.tr,
+                subtitle: 'select_case_subtitle'.tr,
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _MicCard(
+                  listening: _listening,
+                  transcript: _transcript,
                   onTap: _toggleMic,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: _listening
-                            ? [AppColors.safeGreen, const Color(0xFF16A34A)]
-                            : [AppColors.primary, AppColors.purple],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: (_listening ? AppColors.safeGreen : AppColors.primary).withOpacity(0.35),
-                          blurRadius: 14,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 52, height: 52,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            _listening ? Icons.stop_rounded : Icons.mic_rounded,
-                            color: Colors.white, size: 26,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _listening ? '🔴 শুনছি — থামাতে আবার চাপুন' : '🎤 পরিস্থিতি বলুন',
-                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                _transcript.isNotEmpty
-                                    ? _transcript
-                                    : _listening
-                                        ? 'বলুন...'
-                                        : 'মাইক চাপুন, তারপর পরিস্থিতি বলুন',
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.88)),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ),
-
-                const SizedBox(height: 20),
-                const Text(
+              ),
+              const SizedBox(height: 18),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
                   'অথবা ম্যানুয়ালি নির্বাচন করুন:',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                  style: AppTextStyles.label.copyWith(color: AppColors.textSecondary),
                 ),
-                const SizedBox(height: 12),
-                Expanded(
-                  child: GridView.builder(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 14,
-                      mainAxisSpacing: 14,
-                      childAspectRatio: 0.9,
-                    ),
-                    itemCount: _cases.length,
-                    itemBuilder: (_, i) {
-                      final caseModel = _cases[i];
-                      final (icon, color) = caseIcons[caseModel.id] ?? (Icons.help_outline, AppColors.primary);
-                      return GestureDetector(
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 14,
+                    mainAxisSpacing: 14,
+                    childAspectRatio: 0.95,
+                  ),
+                  itemCount: _cases.length,
+                  itemBuilder: (_, i) {
+                    final caseModel = _cases[i];
+                    final (icon, color) = caseIcons[caseModel.id] ?? (Icons.help_outline, AppColors.primary);
+                    return Material(
+                      color: AppColors.surface,
+                      borderRadius: AppRadius.xlR,
+                      child: InkWell(
                         onTap: () => _selectCase(caseModel),
-                        child: Container(
+                        borderRadius: AppRadius.xlR,
+                        splashColor: color.withValues(alpha: 0.08),
+                        child: Ink(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: color.withOpacity(0.15)),
-                            boxShadow: [BoxShadow(color: color.withOpacity(0.10), blurRadius: 16, offset: const Offset(0, 4))],
+                            color: AppColors.surface,
+                            borderRadius: AppRadius.xlR,
+                            boxShadow: AppShadows.tinted(color),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -290,22 +220,104 @@ class _SelectCaseScreenState extends State<SelectCaseScreen> {
                             children: [
                               Container(
                                 width: 48, height: 48,
-                                decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
+                                decoration: BoxDecoration(
+                                  color: color.withValues(alpha: 0.12),
+                                  borderRadius: AppRadius.mdR,
+                                ),
                                 child: Icon(icon, color: color, size: 24),
                               ),
-                              const SizedBox(height: 10),
-                              Text(caseModel.title,
-                                  maxLines: 2, overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1E1B4B), height: 1.3)),
+                              const SizedBox(height: 12),
+                              Text(
+                                caseModel.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.labelLg,
+                              ),
                             ],
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
-              ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MicCard extends StatelessWidget {
+  final bool listening;
+  final String transcript;
+  final VoidCallback onTap;
+  const _MicCard({
+    required this.listening,
+    required this.transcript,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = listening ? AppColors.safeGreen : AppColors.primary;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: AppRadius.lgR,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.lgR,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: listening
+                  ? [AppColors.safeGreen, const Color(0xFF16A34A)]
+                  : [AppColors.primary, AppColors.purple],
             ),
+            borderRadius: AppRadius.lgR,
+            boxShadow: AppShadows.tinted(accent, strength: 2),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 52, height: 52,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.20),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  listening ? Icons.stop_rounded : Icons.mic_rounded,
+                  color: Colors.white, size: 26,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      listening ? 'শুনছি — থামাতে আবার চাপুন' : 'পরিস্থিতি বলুন',
+                      style: AppTextStyles.labelLg.copyWith(color: Colors.white),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      transcript.isNotEmpty
+                          ? transcript
+                          : listening
+                              ? 'বলুন...'
+                              : 'মাইক চাপুন, তারপর পরিস্থিতি বলুন',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.bodySm.copyWith(color: Colors.white.withValues(alpha: 0.88)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),

@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: ashamitra-backend
+    runtime: node
+    rootDir: ashamitra/backend
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: OTP_EXPIRY_MINUTES
+        value: 10
+      - key: USE_REAL_OTP
+        value: true
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY_2
+        sync: false
+      - key: GEMINI_API_KEY_3
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: VAPI_API_KEY
+        sync: false

@@ -23,10 +23,15 @@ dependencies:
   open_file: ^3.3.2
   speech_to_text: ^7.0.0
   flutter_tts: ^4.2.0
+  audioplayers: ^6.1.0
   crypto: ^3.0.3
   sqflite: ^2.3.3
   uuid: ^4.4.0
   geolocator: ^14.0.2
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  google_fonts: ^6.2.1
+  shimmer: ^3.0.0
 
 dev_dependencies:
   flutter_test:

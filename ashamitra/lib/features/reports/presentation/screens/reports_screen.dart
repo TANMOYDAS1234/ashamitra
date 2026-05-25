@@ -1,15 +1,56 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pdf/pdf.dart';
+import '../../../../shared/widgets/referral_map/referral_map_widget.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_gradients.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/utils/pdf_helper.dart';
+import '../../../../shared/components/app_header.dart';
 import '../../../../shared/components/bottom_nav.dart';
+import '../../../../shared/widgets/count_up.dart';
+import '../../../../shared/widgets/empty_state.dart';
+import '../../../../shared/widgets/skeleton.dart';
 import '../../../patients/controller/patient_controller.dart';
 
-class ReportsScreen extends StatelessWidget {
+class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
+
+  @override
+  State<ReportsScreen> createState() => _ReportsScreenState();
+}
+
+class _ReportsScreenState extends State<ReportsScreen> {
+  // ── Filter state ────────────────────────────────────────────────────────
+  // Worker only sees their own reports — no need for worker/district axes.
+  // Band: 'all' | 'emergency' | 'attention' | 'safe'
+  // Time: 'all' | 'today' | 'week' | 'month'
+  String _bandFilter = 'all';
+  String _timeFilter = 'all';
+
+  bool _matchesFilters(Map<String, dynamic> r) {
+    if (_bandFilter != 'all' && r['outcome']?.toString() != _bandFilter) {
+      return false;
+    }
+    if (_timeFilter == 'all') return true;
+    final created = DateTime.tryParse(r['createdAt']?.toString() ?? '');
+    if (created == null) return false;
+    final now = DateTime.now();
+    switch (_timeFilter) {
+      case 'today':
+        return created.year == now.year &&
+            created.month == now.month &&
+            created.day == now.day;
+      case 'week':
+        return now.difference(created).inDays < 7;
+      case 'month':
+        return created.year == now.year && created.month == now.month;
+    }
+    return true;
+  }
 
   Color _outcomeColor(String outcome) => switch (outcome) {
         'emergency' => AppColors.emergencyRed,
@@ -125,7 +166,8 @@ class ReportsScreen extends StatelessWidget {
       );
 
   Future<void> _downloadPdf(List<Map<String, dynamic>> reports) async {
-    final doc = pw.Document();
+    final theme = await PdfHelper.bengaliTheme();
+    final doc = pw.Document(theme: theme);
     final now = DateTime.now();
     final generatedAt =
         '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}  '
@@ -620,97 +662,134 @@ class ReportsScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Header ──────────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                child: Row(
+              Obx(() {
+                final visibleReports = ctrl.reports.where(_matchesFilters).toList();
+                return AppHeader(
+                  title: 'রিপোর্ট',
+                  subtitle: 'সকল ট্রায়াজ সেশন',
+                  showBack: false,
+                  actions: [
+                    HeaderActionPill(
+                      icon: Icons.download_rounded,
+                      label: 'PDF',
+                      onTap: () => _downloadPdf(visibleReports),
+                    ),
+                  ],
+                );
+              }),
+              const SizedBox(height: 8),
+
+              // ── Filter chips ────────────────────────────────────────────
+              SizedBox(
+                height: 40,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                   children: [
-                    const Text('রিপোর্ট',
-                        style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.onBackground)),
-                    const Spacer(),
-                    // Fix GetX warning: single Obx only where reactive data is read
-                    Obx(() {
-                      final reports = ctrl.reports.toList();
-                      return GestureDetector(
-                        onTap: () => _downloadPdf(reports),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                  color: AppColors.primary
-                                      .withValues(alpha: 0.3),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3))
-                            ],
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.download_rounded,
-                                  color: Colors.white, size: 16),
-                              SizedBox(width: 6),
-                              Text('PDF',
-                                  style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600)),
-                            ],
-                          ),
-                        ),
-                      );
-                    }),
+                    _ChipBtn(
+                      label: 'সব',
+                      selected: _bandFilter == 'all',
+                      onTap: () => setState(() => _bandFilter = 'all'),
+                    ),
+                    _ChipBtn(
+                      label: 'জরুরি',
+                      color: AppColors.emergencyRed,
+                      selected: _bandFilter == 'emergency',
+                      onTap: () => setState(() => _bandFilter = 'emergency'),
+                    ),
+                    _ChipBtn(
+                      label: 'মনোযোগ',
+                      color: AppColors.warningYellow,
+                      selected: _bandFilter == 'attention',
+                      onTap: () => setState(() => _bandFilter = 'attention'),
+                    ),
+                    _ChipBtn(
+                      label: 'নিরাপদ',
+                      color: AppColors.safeGreen,
+                      selected: _bandFilter == 'safe',
+                      onTap: () => setState(() => _bandFilter = 'safe'),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      width: 1,
+                      height: 24,
+                      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      color: AppColors.cardBorder,
+                    ),
+                    _ChipBtn(
+                      label: 'সব সময়',
+                      selected: _timeFilter == 'all',
+                      onTap: () => setState(() => _timeFilter = 'all'),
+                    ),
+                    _ChipBtn(
+                      label: 'আজ',
+                      selected: _timeFilter == 'today',
+                      onTap: () => setState(() => _timeFilter = 'today'),
+                    ),
+                    _ChipBtn(
+                      label: '৭ দিন',
+                      selected: _timeFilter == 'week',
+                      onTap: () => setState(() => _timeFilter = 'week'),
+                    ),
+                    _ChipBtn(
+                      label: 'এই মাস',
+                      selected: _timeFilter == 'month',
+                      onTap: () => setState(() => _timeFilter = 'month'),
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 4),
-              const Padding(
-                padding: EdgeInsets.only(left: 20),
-                child: Text('সকল ট্রায়াজ সেশন',
-                    style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary)),
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
 
               // Fix overflow bottom: Expanded wraps the reactive list
               Expanded(
                 child: Obx(() {
                   if (ctrl.isLoading.value) {
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.primary,
-                        strokeWidth: 3,
-                      ),
+                    return ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                      children: const [
+                        Row(
+                          children: [
+                            SkeletonStatCard(),
+                            SizedBox(width: 8),
+                            SkeletonStatCard(),
+                            SizedBox(width: 8),
+                            SkeletonStatCard(),
+                            SizedBox(width: 8),
+                            SkeletonStatCard(),
+                          ],
+                        ),
+                        SizedBox(height: 20),
+                        SkeletonReportCard(),
+                        SkeletonReportCard(),
+                        SkeletonReportCard(),
+                        SkeletonReportCard(),
+                      ],
                     );
                   }
 
-                  final reports = ctrl.reports;
+                  final allReports = ctrl.reports;
+                  final reports = allReports.where(_matchesFilters).toList();
 
+                  if (allReports.isEmpty) {
+                    return const EmptyState(
+                      icon: Icons.assignment_outlined,
+                      title: 'এখনো কোনো রিপোর্ট নেই',
+                      subtitle: 'ট্রায়াজ সম্পন্ন করলে এখানে রিপোর্ট দেখাবে',
+                    );
+                  }
                   if (reports.isEmpty) {
-                    return const Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.assignment_outlined,
-                              size: 56, color: AppColors.textLight),
-                          SizedBox(height: 12),
-                          Text('এখনো কোনো রিপোর্ট নেই',
-                              style: TextStyle(
-                                  fontSize: 15,
-                                  color: AppColors.textSecondary)),
-                          SizedBox(height: 4),
-                          Text('ট্রায়াজ করলে এখানে দেখাবে',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textLight)),
-                        ],
+                    return EmptyState(
+                      icon: Icons.filter_alt_off_rounded,
+                      title: 'এই ফিল্টারে কোনো রিপোর্ট নেই',
+                      subtitle: 'অন্য ব্যান্ড বা সময় বেছে নিন',
+                      action: FilledButton.icon(
+                        onPressed: () => setState(() {
+                          _bandFilter = 'all';
+                          _timeFilter = 'all';
+                        }),
+                        icon: const Icon(Icons.clear_rounded, size: 18),
+                        label: const Text('ফিল্টার মুছে ফেলুন'),
                       ),
                     );
                   }
@@ -769,11 +848,7 @@ class ReportsScreen extends StatelessWidget {
                         _CaseBreakdown(reports: reports.toList()),
                         const SizedBox(height: 20),
 
-                        const Text('সেশন ইতিহাস',
-                            style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.onBackground)),
+                        Text('সেশন ইতিহাস', style: AppTextStyles.h3),
                         const SizedBox(height: 10),
 
                         ...reports.map((r) => _ReportCard(
@@ -804,7 +879,7 @@ class ReportsScreen extends StatelessWidget {
 // ── Stat card — Expanded so all 4 fill the row width equally ─────────────────
 class _StatCard extends StatelessWidget {
   final String label;
-  final String count;
+  final String count;  // String for backwards-compatibility — parsed to int below
   final IconData icon;
   final Color color;
 
@@ -819,40 +894,36 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-                color: color.withValues(alpha: 0.10),
-                blurRadius: 10,
-                offset: const Offset(0, 3))
-          ],
+          color: AppColors.surface,
+          borderRadius: AppRadius.lgR,
+          boxShadow: AppShadows.tinted(color),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 30,
-              height: 30,
+              width: 32,
+              height: 32,
               decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8)),
-              child: Icon(icon, color: color, size: 15),
+                color: color.withValues(alpha: 0.12),
+                borderRadius: AppRadius.smR,
+              ),
+              child: Icon(icon, color: color, size: 16),
             ),
-            const SizedBox(height: 6),
-            Text(count,
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: color)),
-            Text(label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                    fontSize: 9, color: AppColors.textSecondary)),
+            const SizedBox(height: 8),
+            CountUp(
+              value: int.tryParse(count) ?? 0,
+              style: AppTextStyles.h2.copyWith(color: color),
+            ),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.caption,
+            ),
           ],
         ),
       ),
@@ -860,8 +931,8 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-// ── Individual report card ────────────────────────────────────────────────────
-class _ReportCard extends StatelessWidget {
+// ── Individual report card (expandable) ──────────────────────────────────────
+class _ReportCard extends StatefulWidget {
   final Map<String, dynamic> r;
   final Color outcomeColor;
   final IconData outcomeIcon;
@@ -877,152 +948,290 @@ class _ReportCard extends StatelessWidget {
   });
 
   @override
+  State<_ReportCard> createState() => _ReportCardState();
+}
+
+class _ReportCardState extends State<_ReportCard> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
-    final dangerSigns =
-        (r['dangerSigns'] as List? ?? []).cast<String>();
+    final r = widget.r;
+    final outcomeColor = widget.outcomeColor;
+    final dangerSigns = (r['dangerSigns'] as List? ?? []).cast<String>();
+    final suspectedConditions = (r['suspectedConditions'] as List? ?? []).cast<String>();
+    final triggeredRules = (r['triggeredRules'] as List? ?? []).cast<String>();
+    final qaHistory = r['qaHistory'] as List? ?? [];
     final riskScore = r['riskScore'] as int? ?? 0;
     final facilityType = r['facilityType']?.toString() ?? '';
     final recheckHours = r['recheckAfterHours'] as int? ?? 0;
+    final reason = r['reason']?.toString() ?? '';
+    final nextStep = r['nextStep']?.toString() ?? '';
+    final situation = r['situation']?.toString() ?? '';
+    final transportAction = r['transportAction']?.toString() ?? '';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-            color: outcomeColor.withValues(alpha: 0.25), width: 1),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2))
-        ],
+        color: AppColors.surface,
+        borderRadius: AppRadius.lgR,
+        boxShadow: AppShadows.tinted(outcomeColor),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                    color: outcomeColor.withValues(alpha: 0.12),
-                    shape: BoxShape.circle),
-                child:
-                    Icon(outcomeIcon, color: outcomeColor, size: 18),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
+          // ── Summary row (always visible) ──────────────────────────────
+          Material(
+            color: Colors.transparent,
+            borderRadius: AppRadius.lgR,
+            child: InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              borderRadius: AppRadius.lgR,
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(r['caseLabel']?.toString() ?? '',
-                        style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.onBackground)),
-                    const SizedBox(height: 2),
-                    Text(
-                      r['patientName']?.toString().isNotEmpty == true
-                          ? r['patientName'].toString()
-                          : 'অজ্ঞাত রোগী',
-                      style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary),
+                    Container(
+                      width: 40, height: 40,
+                      decoration: BoxDecoration(
+                          color: outcomeColor.withValues(alpha: 0.12),
+                          shape: BoxShape.circle),
+                      child: Icon(widget.outcomeIcon, color: outcomeColor, size: 20),
                     ),
-                    Text(
-                        formatDate(
-                            r['createdAt']?.toString() ?? ''),
-                        style: const TextStyle(
-                            fontSize: 10,
-                            color: AppColors.textLight)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            r['caseLabel']?.toString() ?? '',
+                            style: AppTextStyles.labelLg,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            r['patientName']?.toString().isNotEmpty == true ? r['patientName'].toString() : 'অজ্ঞাত রোগী',
+                            style: AppTextStyles.bodySm,
+                          ),
+                          Text(
+                            widget.formatDate(r['createdAt']?.toString() ?? ''),
+                            style: AppTextStyles.caption.copyWith(color: AppColors.textLight),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: outcomeColor.withValues(alpha: 0.12),
+                            borderRadius: AppRadius.pillR,
+                          ),
+                          child: Text(
+                            widget.outcomeLabel,
+                            style: AppTextStyles.caption.copyWith(
+                              color: outcomeColor,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        if (riskScore > 0) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Score: $riskScore',
+                            style: AppTextStyles.caption.copyWith(color: AppColors.textLight, fontSize: 10),
+                          ),
+                        ],
+                        const SizedBox(height: 4),
+                        Icon(
+                          _expanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                          size: 20,
+                          color: AppColors.textSecondary,
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              // Fix overflow right: Column instead of unbounded Row on right side
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
+            ),
+          ),
+
+          // ── Expanded detail section ───────────────────────────────────
+          if (_expanded) ...[
+            Divider(height: 1, color: outcomeColor.withValues(alpha: 0.15)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: outcomeColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
+
+                  // Danger signs
+                  if (dangerSigns.isNotEmpty) ...[
+                    _sectionLabel('বিপদচিহ্ন', Icons.warning_amber_rounded, AppColors.emergencyRed),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 4, runSpacing: 4,
+                      children: dangerSigns.map((s) => _chip(s, AppColors.emergencyRed)).toList(),
                     ),
-                    child: Text(outcomeLabel,
-                        style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: outcomeColor)),
-                  ),
-                  if (riskScore > 0) ...[
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Suspected conditions
+                  if (suspectedConditions.isNotEmpty) ...[
+                    _sectionLabel('সম্ভাব্য অবস্থা', Icons.medical_information_rounded, AppColors.warningYellow),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 4, runSpacing: 4,
+                      children: suspectedConditions.map((s) => _chip(s, AppColors.warningYellow)).toList(),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Clinical decision
+                  if (reason.isNotEmpty) ...[
+                    _sectionLabel('ক্লিনিক্যাল সিদ্ধান্ত', Icons.assignment_rounded, AppColors.primary),
+                    const SizedBox(height: 6),
+                    _infoBox(reason, AppColors.primary),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Next step
+                  if (nextStep.isNotEmpty) ...[
+                    _sectionLabel('পরবর্তী পদক্ষেপ', Icons.arrow_forward_rounded, outcomeColor),
+                    const SizedBox(height: 6),
+                    _infoBox(nextStep, outcomeColor),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Situation
+                  if (situation.isNotEmpty) ...[
+                    _sectionLabel('পরিস্থিতি', Icons.notes_rounded, AppColors.textSecondary),
+                    const SizedBox(height: 6),
+                    _infoBox(situation, AppColors.textSecondary),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Facility & recheck
+                  if (facilityType.isNotEmpty && facilityType != 'None') ...[
+                    _sectionLabel('রেফার কেন্দ্র', Icons.local_hospital_rounded, AppColors.sky),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(child: _infoBox(facilityType, AppColors.sky)),
+                        if (recheckHours > 0) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.sky.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.sky.withValues(alpha: 0.3)),
+                            ),
+                            child: Text('ফলো-আপ\n${recheckHours}h',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 10, color: AppColors.sky, fontWeight: FontWeight.w700)),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Transport action
+                  if (transportAction.isNotEmpty && transportAction != 'None') ...[
+                    _sectionLabel('পরিবহন', Icons.directions_car_rounded, AppColors.purple),
+                    const SizedBox(height: 6),
+                    _infoBox(transportAction, AppColors.purple),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Triggered rules
+                  if (triggeredRules.isNotEmpty) ...[
+                    _sectionLabel('ট্রিগার্ড রুলস', Icons.rule_rounded, AppColors.textSecondary),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 4, runSpacing: 4,
+                      children: triggeredRules.map((s) => _chip(s, AppColors.primary)).toList(),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Q&A history
+                  if (qaHistory.isNotEmpty) ...[
+                    _sectionLabel('প্রশ্নোত্তর', Icons.chat_bubble_outline_rounded, AppColors.primary),
+                    const SizedBox(height: 8),
+                    ...qaHistory.map((qa) {
+                      final m = qa is Map ? qa : {};
+                      final q = m['question']?.toString() ?? '';
+                      final a = m['answer']?.toString() ?? '';
+                      if (q.isEmpty) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFF),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFE0E7FF)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(q, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, height: 1.4)),
+                              const SizedBox(height: 4),
+                              Text(a, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.onBackground)),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+
+                  // Nearest referral map
+                  if (facilityType.isNotEmpty && facilityType != 'None') ...[
                     const SizedBox(height: 4),
-                    Text('Score: $riskScore',
-                        style: const TextStyle(
-                            fontSize: 9,
-                            color: AppColors.textLight)),
+                    ReferralMapWidget(facilityType: facilityType),
                   ],
                 ],
               ),
-            ],
-          ),
-          if (dangerSigns.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 4,
-              runSpacing: 4,
-              children: dangerSigns
-                  .take(3)
-                  .map((s) => Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color:
-                              outcomeColor.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                              color: outcomeColor
-                                  .withValues(alpha: 0.2)),
-                        ),
-                        child: Text(s,
-                            style: TextStyle(
-                                fontSize: 9,
-                                color: outcomeColor,
-                                fontWeight: FontWeight.w600)),
-                      ))
-                  .toList(),
-            ),
-          ],
-          if (facilityType.isNotEmpty && facilityType != 'None') ...[
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const Icon(Icons.local_hospital_rounded,
-                    size: 11, color: AppColors.textSecondary),
-                const SizedBox(width: 4),
-                Expanded(
-                    child: Text(facilityType,
-                        style: const TextStyle(
-                            fontSize: 10,
-                            color: AppColors.textSecondary))),
-                if (recheckHours > 0)
-                  Text('ফলো-আপ: ${recheckHours}h',
-                      style: const TextStyle(
-                          fontSize: 9,
-                          color: AppColors.textLight)),
-              ],
             ),
           ],
         ],
       ),
     );
   }
+
+  Widget _sectionLabel(String label, IconData icon, Color color) => Row(
+    children: [
+      Icon(icon, size: 13, color: color),
+      const SizedBox(width: 5),
+      Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color, letterSpacing: 0.3)),
+    ],
+  );
+
+  Widget _chip(String label, Color color) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(6),
+      border: Border.all(color: color.withValues(alpha: 0.25)),
+    ),
+    child: Text(label, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600)),
+  );
+
+  Widget _infoBox(String text, Color color) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.06),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: color.withValues(alpha: 0.2)),
+    ),
+    child: Text(text, style: TextStyle(fontSize: 12, color: AppColors.onBackground, height: 1.5)),
+  );
 }
 
 // ── Case breakdown bar chart ──────────────────────────────────────────────────
@@ -1053,58 +1262,42 @@ class _CaseBreakdown extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.06),
-              blurRadius: 12,
-              offset: const Offset(0, 4))
-        ],
+        color: AppColors.surface,
+        borderRadius: AppRadius.lgR,
+        boxShadow: AppShadows.mid,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('কেস ধরন বিভাজন',
-              style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.onBackground)),
-          const SizedBox(height: 12),
+          Text('কেস ধরন বিভাজন', style: AppTextStyles.h3),
+          const SizedBox(height: 14),
           ...counts.entries.toList().asMap().entries.map((entry) {
             final i = entry.key;
             final label = entry.value.key;
             final count = entry.value.value;
             final color = colors[i % colors.length];
             return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(bottom: 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Expanded(
-                          child: Text(label,
-                              style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.onBackground))),
-                      Text('$count কেস',
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: color,
-                              fontWeight: FontWeight.w600)),
+                      Expanded(child: Text(label, style: AppTextStyles.label)),
+                      Text(
+                        '$count কেস',
+                        style: AppTextStyles.label.copyWith(color: color),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                     child: LinearProgressIndicator(
                       value: count / total,
-                      backgroundColor:
-                          color.withValues(alpha: 0.1),
+                      backgroundColor: color.withValues(alpha: 0.10),
                       color: color,
-                      minHeight: 6,
+                      minHeight: 8,
                     ),
                   ),
                 ],
@@ -1112,6 +1305,54 @@ class _CaseBreakdown extends StatelessWidget {
             );
           }),
         ],
+      ),
+    );
+  }
+}
+
+// ── Filter chip used by the worker's reports filter row ─────────────────────
+class _ChipBtn extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final Color? color;
+
+  const _ChipBtn({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = color ?? AppColors.primary;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Material(
+        color: selected ? accent : AppColors.surface,
+        borderRadius: AppRadius.pillR,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: AppRadius.pillR,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: selected ? accent : AppColors.surface,
+              borderRadius: AppRadius.pillR,
+              boxShadow: selected
+                  ? AppShadows.tinted(accent, strength: 2)
+                  : AppShadows.low,
+            ),
+            child: Text(
+              label,
+              style: AppTextStyles.label.copyWith(
+                color: selected ? AppColors.onPrimary : AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

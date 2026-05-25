@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_gradients.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_text_styles.dart';
 import '../../../../features/auth/data/models/user_model.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../../../admin/controller/admin_controller.dart';
@@ -35,12 +38,8 @@ class _AdminWorkersTabState extends State<AdminWorkersTab> {
               padding: const EdgeInsets.fromLTRB(20, 20, 16, 12),
               child: Row(
                 children: [
-                  const Expanded(
-                    child: Text('ASHA Workers',
-                        style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.onBackground)),
+                  Expanded(
+                    child: Text('ASHA Workers', style: AppTextStyles.h2),
                   ),
                   IconButton(
                     onPressed: () => _showAddSheet(context, ctrl),
@@ -49,7 +48,7 @@ class _AdminWorkersTabState extends State<AdminWorkersTab> {
                       padding: const EdgeInsets.all(10),
                     ),
                     icon: const Icon(Icons.person_add_alt_1_rounded,
-                        color: Colors.white, size: 20),
+                        color: AppColors.onPrimary, size: 20),
                     tooltip: 'Add ASHA Worker',
                   ),
                 ],
@@ -74,11 +73,7 @@ class _AdminWorkersTabState extends State<AdminWorkersTab> {
                             color: AppColors.textSecondary
                                 .withValues(alpha: 0.4)),
                         const SizedBox(height: 16),
-                        Text('admin_no_asha'.tr,
-                            style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textSecondary)),
+                        Text('admin_no_asha'.tr, style: AppTextStyles.labelLg),
                         const SizedBox(height: 12),
                         ElevatedButton.icon(
                           onPressed: () => _showAddSheet(context, ctrl),
@@ -86,9 +81,9 @@ class _AdminWorkersTabState extends State<AdminWorkersTab> {
                           label: Text('admin_add_asha'.tr),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
+                            foregroundColor: AppColors.onPrimary,
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
+                                borderRadius: AppRadius.mdR),
                           ),
                         ),
                       ],
@@ -136,9 +131,9 @@ class _AdminWorkersTabState extends State<AdminWorkersTab> {
         padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).viewInsets.bottom),
         child: Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
           ),
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
           child: Form(
@@ -157,11 +152,7 @@ class _AdminWorkersTabState extends State<AdminWorkersTab> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text('admin_add_asha'.tr,
-                    style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.onBackground)),
+                Text('admin_add_asha'.tr, style: AppTextStyles.h3),
                 const SizedBox(height: 20),
                 _formField(name, 'admin_full_name'.tr, Icons.person_rounded,
                     validator: (v) => (v == null || v.trim().isEmpty)
@@ -201,7 +192,7 @@ class _AdminWorkersTabState extends State<AdminWorkersTab> {
                                     'admin_success'.tr,
                                     'admin_add_success'.tr,
                                     backgroundColor: AppColors.safeGreen,
-                                    colorText: Colors.white,
+                                    colorText: AppColors.onPrimary,
                                     snackPosition: SnackPosition.BOTTOM,
                                     margin: const EdgeInsets.all(16),
                                     borderRadius: 12,
@@ -211,7 +202,7 @@ class _AdminWorkersTabState extends State<AdminWorkersTab> {
                                     'Error',
                                     ctrl.errorMsg.value,
                                     backgroundColor: AppColors.emergencyRed,
-                                    colorText: Colors.white,
+                                    colorText: AppColors.onPrimary,
                                     snackPosition: SnackPosition.BOTTOM,
                                     margin: const EdgeInsets.all(16),
                                     borderRadius: 12,
@@ -220,21 +211,18 @@ class _AdminWorkersTabState extends State<AdminWorkersTab> {
                               },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
+                          foregroundColor: AppColors.onPrimary,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14)),
+                              borderRadius: AppRadius.lgR),
                         ),
                         child: saving.value
                             ? const SizedBox(
                                 width: 22,
                                 height: 22,
                                 child: CircularProgressIndicator(
-                                    color: Colors.white, strokeWidth: 2))
-                            : Text('admin_save'.tr,
-                                style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700)),
+                                    color: AppColors.onPrimary, strokeWidth: 2))
+                            : Text('admin_save'.tr, style: AppTextStyles.labelLg.copyWith(color: AppColors.onPrimary)),
                       ),
                     )),
               ],
@@ -262,9 +250,9 @@ class _AdminWorkersTabState extends State<AdminWorkersTab> {
         maxChildSize: 0.95,
         minChildSize: 0.4,
         builder: (sheetCtx, scrollCtrl) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
           ),
           child: Column(
             children: [
@@ -302,20 +290,11 @@ class _AdminWorkersTabState extends State<AdminWorkersTab> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(worker.name,
-                              style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.onBackground)),
-                          Text(worker.phone,
-                              style: const TextStyle(
-                                  fontSize: 13,
-                                  color: AppColors.textSecondary)),
+                          Text(worker.name, style: AppTextStyles.h3),
+                          Text(worker.phone, style: AppTextStyles.bodySm),
                           if (worker.block.isNotEmpty)
                             Text('${worker.block}, ${worker.district}',
-                                style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary)),
+                                style: AppTextStyles.caption),
                         ],
                       ),
                     ),
@@ -327,17 +306,16 @@ class _AdminWorkersTabState extends State<AdminWorkersTab> {
                                   ? AppColors.safeGreen
                                   : AppColors.textSecondary)
                               .withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10)),
+                          borderRadius: AppRadius.smR),
                       child: Text(
                         worker.isActive
                             ? 'admin_active'.tr
                             : 'admin_inactive'.tr,
-                        style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: worker.isActive
-                                ? AppColors.safeGreen
-                                : AppColors.textSecondary),
+                        style: AppTextStyles.overline.copyWith(
+                          color: worker.isActive
+                              ? AppColors.safeGreen
+                              : AppColors.textSecondary,
+                        ),
                       ),
                     ),
                   ],
@@ -364,11 +342,7 @@ class _AdminWorkersTabState extends State<AdminWorkersTab> {
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                   children: [
                     if (patients.isNotEmpty) ...[
-                      const Text('Patients',
-                          style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.onBackground)),
+                      Text('Patients', style: AppTextStyles.label),
                       const SizedBox(height: 8),
                       ...patients.map((p) => _PatientRow(p,
                           onTap: () => Get.toNamed(
@@ -376,23 +350,16 @@ class _AdminWorkersTabState extends State<AdminWorkersTab> {
                       const SizedBox(height: 16),
                     ],
                     if (reports.isNotEmpty) ...[
-                      const Text('Reports',
-                          style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.onBackground)),
+                      Text('Reports', style: AppTextStyles.label),
                       const SizedBox(height: 8),
                       ...reports.map((r) => _ReportRow(r,
                           onTap: () => showAdminReportDetail(sheetCtx, r))),
                     ],
                     if (patients.isEmpty && reports.isEmpty)
-                      const Center(
+                      Center(
                         child: Padding(
-                          padding: EdgeInsets.only(top: 32),
-                          child: Text('No activity yet',
-                              style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 14)),
+                          padding: const EdgeInsets.only(top: 32),
+                          child: Text('No activity yet', style: AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
                         ),
                       ),
                   ],
@@ -417,17 +384,16 @@ class _AdminWorkersTabState extends State<AdminWorkersTab> {
                       backgroundColor: worker.isActive
                           ? AppColors.emergencyRed
                           : AppColors.safeGreen,
-                      foregroundColor: Colors.white,
+                      foregroundColor: AppColors.onPrimary,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
+                          borderRadius: AppRadius.lgR),
                     ),
                     child: Text(
                       worker.isActive
                           ? 'admin_remove'.tr
                           : 'admin_reactivate'.tr,
-                      style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w700),
+                      style: AppTextStyles.labelLg.copyWith(color: AppColors.onPrimary),
                     ),
                   ),
                 ),
@@ -450,31 +416,28 @@ class _AdminWorkersTabState extends State<AdminWorkersTab> {
         controller: ctrl,
         keyboardType: keyboardType,
         validator: validator,
-        style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: AppColors.onBackground),
+        style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500),
         decoration: InputDecoration(
           labelText: label,
           prefixIcon: Icon(icon, color: AppColors.primary, size: 20),
           filled: true,
           fillColor: const Color(0xFFF8FAFC),
           border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppRadius.mdR,
               borderSide: BorderSide.none),
           enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppRadius.mdR,
               borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
           focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppRadius.mdR,
               borderSide:
                   const BorderSide(color: AppColors.primary, width: 1.5)),
           errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppRadius.mdR,
               borderSide:
                   const BorderSide(color: AppColors.emergencyRed)),
           focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppRadius.mdR,
               borderSide:
                   const BorderSide(color: AppColors.emergencyRed, width: 1.5)),
         ),
@@ -495,85 +458,75 @@ class _WorkerCard extends StatelessWidget {
     final statusColor =
         worker.isActive ? AppColors.safeGreen : AppColors.textSecondary;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 14,
-                offset: const Offset(0, 4))
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.08),
-                  shape: BoxShape.circle),
-              child: UserAvatar(
-                user: worker,
-                size: 46,
-                backgroundColor: AppColors.primary.withValues(alpha: 0.08),
-                textColor: AppColors.primary,
+    return Material(
+      color: AppColors.surface,
+      borderRadius: AppRadius.xlR,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.xlR,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: AppRadius.xlR,
+            boxShadow: AppShadows.low,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    shape: BoxShape.circle),
+                child: UserAvatar(
+                  user: worker,
+                  size: 46,
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.08),
+                  textColor: AppColors.primary,
+                ),
               ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(worker.name,
-                      style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.onBackground)),
-                  const SizedBox(height: 2),
-                  Text(worker.phone,
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary)),
-                  if (worker.block.isNotEmpty) ...[
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(worker.name, style: AppTextStyles.labelLg),
                     const SizedBox(height: 2),
-                    Text('${worker.block}, ${worker.district}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 11, color: AppColors.textSecondary)),
+                    Text(worker.phone, style: AppTextStyles.caption),
+                    if (worker.block.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text('${worker.block}, ${worker.district}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.caption),
+                    ],
                   ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.1),
+                        borderRadius: AppRadius.smR),
+                    child: Text(
+                      worker.isActive
+                          ? 'admin_active'.tr
+                          : 'admin_inactive'.tr,
+                      style: AppTextStyles.overline.copyWith(color: statusColor),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Icon(Icons.chevron_right_rounded,
+                      size: 18, color: AppColors.textSecondary),
                 ],
               ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10)),
-                  child: Text(
-                    worker.isActive
-                        ? 'admin_active'.tr
-                        : 'admin_inactive'.tr,
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: statusColor),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Icon(Icons.chevron_right_rounded,
-                    size: 18, color: AppColors.textSecondary),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -596,7 +549,7 @@ class _StatChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
         decoration: BoxDecoration(
             color: color.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(12)),
+            borderRadius: AppRadius.mdR),
         child: Row(
           children: [
             Icon(icon, color: color, size: 18),
@@ -605,13 +558,11 @@ class _StatChip extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(value,
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: color)),
-                Text(label,
-                    style: const TextStyle(
-                        fontSize: 11, color: AppColors.textSecondary)),
+                    style: AppTextStyles.h3.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w800,
+                    )),
+                Text(label, style: AppTextStyles.caption),
               ],
             ),
           ],
@@ -636,38 +587,37 @@ class _PatientRow extends StatelessWidget {
             ? AppColors.warningYellow
             : AppColors.safeGreen;
 
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withValues(alpha: 0.2))),
-        child: Row(
-          children: [
-            Container(
-                width: 8,
-                height: 8,
-                decoration:
-                    BoxDecoration(color: color, shape: BoxShape.circle)),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(p['name']?.toString() ?? '',
-                  style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.onBackground)),
-            ),
-            Text(p['type']?.toString() ?? '',
-                style: const TextStyle(
-                    fontSize: 11, color: AppColors.textSecondary)),
-            const SizedBox(width: 6),
-            const Icon(Icons.chevron_right_rounded,
-                size: 16, color: AppColors.textSecondary),
-          ],
+    return Material(
+      color: const Color(0xFFF8FAFC),
+      borderRadius: AppRadius.mdR,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.mdR,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: AppRadius.mdR,
+              border: Border.all(color: color.withValues(alpha: 0.2))),
+          child: Row(
+            children: [
+              Container(
+                  width: 8,
+                  height: 8,
+                  decoration:
+                      BoxDecoration(color: color, shape: BoxShape.circle)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(p['name']?.toString() ?? '',
+                    style: AppTextStyles.label),
+              ),
+              Text(p['type']?.toString() ?? '', style: AppTextStyles.caption),
+              const SizedBox(width: 6),
+              const Icon(Icons.chevron_right_rounded,
+                  size: 16, color: AppColors.textSecondary),
+            ],
+          ),
         ),
       ),
     );
@@ -689,44 +639,42 @@ class _ReportRow extends StatelessWidget {
             ? AppColors.warningYellow
             : AppColors.safeGreen;
 
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withValues(alpha: 0.2))),
-        child: Row(
-          children: [
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(6)),
-              child: Text(band,
-                  style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: color)),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(r['caseLabel']?.toString() ?? '',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.onBackground)),
-            ),
-            const SizedBox(width: 6),
-            const Icon(Icons.chevron_right_rounded,
-                size: 16, color: AppColors.textSecondary),
-          ],
+    return Material(
+      color: const Color(0xFFF8FAFC),
+      borderRadius: AppRadius.mdR,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.mdR,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: AppRadius.mdR,
+              border: Border.all(color: color.withValues(alpha: 0.2))),
+          child: Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: AppRadius.smR),
+                child: Text(band,
+                    style: AppTextStyles.overline.copyWith(color: color)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(r['caseLabel']?.toString() ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.body),
+              ),
+              const SizedBox(width: 6),
+              const Icon(Icons.chevron_right_rounded,
+                  size: 16, color: AppColors.textSecondary),
+            ],
+          ),
         ),
       ),
     );

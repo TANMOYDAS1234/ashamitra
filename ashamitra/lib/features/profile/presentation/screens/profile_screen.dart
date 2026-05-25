@@ -5,6 +5,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/services/language_controller.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_gradients.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/components/bottom_nav.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../../../auth/controller/auth_controller.dart';
@@ -379,22 +382,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           auth.user.value?.name ?? 'ASHA Worker',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white),
+                          style: AppTextStyles.h2.copyWith(color: Colors.white),
                         )),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Obx(() {
                       final id = auth.user.value?.id ?? '';
                       final shortId = id.length > 8 ? id.substring(id.length - 8).toUpperCase() : id.toUpperCase();
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
                         decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12)),
-                        child: Text('ID: ASHA-$shortId',
-                            style: const TextStyle(fontSize: 12, color: Colors.white)),
+                          color: Colors.white.withValues(alpha: 0.20),
+                          borderRadius: AppRadius.pillR,
+                        ),
+                        child: Text(
+                          'ID: ASHA-$shortId',
+                          style: AppTextStyles.caption.copyWith(color: Colors.white),
+                        ),
                       );
                     }),
                   ],
@@ -434,29 +437,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             'contact_supervisor'.tr, _callSupervisor),
                       ]),
                       const SizedBox(height: 16),
-                      GestureDetector(
-                        onTap: () => auth.logout(),
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          decoration: BoxDecoration(
-                            color: AppColors.emergencyRed.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                                color: AppColors.emergencyRed.withOpacity(0.2)),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.logout_rounded,
-                                  color: AppColors.emergencyRed, size: 20),
-                              const SizedBox(width: 8),
-                              Text('logout'.tr,
-                                  style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.emergencyRed)),
-                            ],
+                      Material(
+                        color: AppColors.emergencyRed.withValues(alpha: 0.08),
+                        borderRadius: AppRadius.lgR,
+                        child: InkWell(
+                          onTap: () => auth.logout(),
+                          borderRadius: AppRadius.lgR,
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.logout_rounded,
+                                    color: AppColors.emergencyRed, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'logout'.tr,
+                                  style: AppTextStyles.labelLg.copyWith(color: AppColors.emergencyRed),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -508,23 +509,15 @@ class _Section extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title,
-            style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textSecondary,
-                letterSpacing: 0.5)),
-        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(title.toUpperCase(), style: AppTextStyles.overline),
+        ),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 12,
-                  offset: const Offset(0, 3))
-            ],
+            color: AppColors.surface,
+            borderRadius: AppRadius.lgR,
+            boxShadow: AppShadows.low,
           ),
           child: Column(children: items),
         ),
@@ -547,15 +540,9 @@ class _InfoRow extends StatelessWidget {
         children: [
           Icon(icon, color: AppColors.primary, size: 20),
           const SizedBox(width: 12),
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 14, color: AppColors.textSecondary)),
+          Text(label, style: AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
           const Spacer(),
-          Text(value,
-              style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.onBackground)),
+          Text(value, style: AppTextStyles.labelLg),
         ],
       ),
     );
@@ -572,16 +559,14 @@ class _ActionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: AppRadius.lgR,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
             Icon(icon, color: AppColors.primary, size: 20),
             const SizedBox(width: 12),
-            Text(label,
-                style: const TextStyle(
-                    fontSize: 14, color: AppColors.onBackground)),
+            Text(label, style: AppTextStyles.body),
             const Spacer(),
             const Icon(Icons.arrow_forward_ios_rounded,
                 size: 14, color: AppColors.textSecondary),

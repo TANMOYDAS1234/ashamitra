@@ -6,6 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_gradients.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/widgets/emergency_button.dart';
 
 class EmergencyScreen extends StatelessWidget {
@@ -66,26 +68,25 @@ class EmergencyScreen extends StatelessWidget {
     final coords = '${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}';
     final shareLink = 'https://maps.google.com/?q=$lat,$lng';
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text('রোগীর অবস্থান',
-          style: TextStyle(fontWeight: FontWeight.bold)),
+      shape: RoundedRectangleBorder(borderRadius: AppRadius.lgR),
+      title: Text('রোগীর অবস্থান', style: AppTextStyles.h2),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('এই অবস্থান অ্যাম্বুলেন্স বা সুপারভাইজারকে পাঠান:',
-              style: TextStyle(fontSize: 13)),
+          Text(
+            'এই অবস্থান অ্যাম্বুলেন্স বা সুপারভাইজারকে পাঠান:',
+            style: AppTextStyles.bodySm,
+          ),
           const SizedBox(height: 10),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: AppRadius.mdR,
             ),
-            child: Text(coords,
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.bold)),
+            child: Text(coords, style: AppTextStyles.h3),
           ),
         ],
       ),
@@ -125,39 +126,41 @@ class EmergencyScreen extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        GestureDetector(
-                          onTap: () => Get.back(),
-                          child: Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              shape: BoxShape.circle,
+                        Material(
+                          color: Colors.white.withValues(alpha: 0.20),
+                          shape: const CircleBorder(),
+                          child: InkWell(
+                            onTap: () => Get.back(),
+                            customBorder: const CircleBorder(),
+                            child: const SizedBox(
+                              width: 44,
+                              height: 44,
+                              child: Icon(Icons.arrow_back_ios_new_rounded,
+                                  size: 18, color: Colors.white),
                             ),
-                            child: const Icon(Icons.arrow_back_ios_new_rounded,
-                                size: 18, color: Colors.white),
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Text('emergency_title'.tr,
-                            style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white)),
+                        Text(
+                          'emergency_title'.tr,
+                          style: AppTextStyles.h2.copyWith(color: Colors.white),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 20),
                     const Icon(Icons.emergency_rounded, size: 56, color: Colors.white),
                     const SizedBox(height: 8),
-                    Text('emergency_subtitle'.tr,
-                        style: const TextStyle(fontSize: 15, color: Colors.white70)),
-                    const SizedBox(height: 4),
+                    Text(
+                      'emergency_subtitle'.tr,
+                      style: AppTextStyles.bodyLg.copyWith(color: Colors.white.withValues(alpha: 0.85)),
+                    ),
+                    const SizedBox(height: 6),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: Text(
                         'emergency_conditions'.tr,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 12, color: Colors.white60),
+                        style: AppTextStyles.bodySm.copyWith(color: Colors.white.withValues(alpha: 0.70)),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -169,7 +172,7 @@ class EmergencyScreen extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
                 child: Container(
-                  color: const Color(0xFFF7F8FF),
+                  color: AppColors.background,
                   child: SafeArea(
                     top: false,
                     child: SingleChildScrollView(
@@ -215,15 +218,11 @@ class EmergencyScreen extends StatelessWidget {
                             onTap: () => _openMaps('Community Health Centre near me'),
                           ),
                           const SizedBox(height: 24),
-                          GestureDetector(
-                            onTap: () => Get.offAllNamed(AppRoutes.home),
+                          TextButton(
+                            onPressed: () => Get.offAllNamed(AppRoutes.home),
                             child: Text(
                               'back_to_home'.tr,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: AppColors.textSecondary,
-                                fontWeight: FontWeight.w500,
-                              ),
+                              style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
                             ),
                           ),
                           const SizedBox(height: 8),

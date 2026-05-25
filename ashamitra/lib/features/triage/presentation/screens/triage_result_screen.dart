@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../../app/routes.dart';
+import '../../../../shared/widgets/referral_map/referral_map_widget.dart';
 import '../../../../core/services/rule_executor.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_gradients.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/widgets/triage_result_card.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../patients/controller/patient_controller.dart';
@@ -247,7 +250,11 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
     final patientId = _args['_patientId']?.toString() ?? '';
 
     // If this triage was started from an existing patient, attach the result
-    // to that patient instead of creating a duplicate list entry.
+    // to that patient (updates latest-triage snapshot on the Patient doc).
+    // For anonymous triage we **do not** create a ghost patient — the
+    // Report saved in _autoSaveReport above is the canonical record.
+    // Worker can later view it in the Reports tab or add a real patient
+    // and link the situation.
     final linked = patientId.isNotEmpty &&
         ctrl.applyFollowUp(
           patientId: patientId,
@@ -258,22 +265,11 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
           qaHistory: qaHistory,
         );
 
-    if (!linked) {
-      ctrl.saveTriageResult(
-        caseType: _caseType,
-        outcome: outcomeStr,
-        reason: _reasonText,
-        nextStep: _nextStepText,
-        situation: situation,
-        qaHistory: qaHistory,
-      );
-    }
-
     Get.snackbar(
       'সংরক্ষিত হয়েছে',
       linked
           ? 'রোগীর তথ্য হালনাগাদ করা হয়েছে।'
-          : 'ট্রায়াজ ফলাফল রোগী তালিকায় যোগ হয়েছে।',
+          : 'রিপোর্ট সংরক্ষিত হয়েছে। Reports ট্যাবে দেখুন।',
       snackPosition: SnackPosition.BOTTOM,
       backgroundColor: AppColors.safeGreen,
       colorText: Colors.white,
@@ -293,34 +289,40 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
               children: [
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
                 // ── Header ──────────────────────────────────────────────────
                 Row(
                   children: [
-                    GestureDetector(
-                      onTap: () => Get.offAllNamed(AppRoutes.home),
-                      child: Container(
-                        width: 42, height: 42,
-                        decoration: BoxDecoration(
-                          color: Colors.white, shape: BoxShape.circle,
-                          boxShadow: [BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
-                              blurRadius: 8)],
+                    Material(
+                      color: AppColors.surface,
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        onTap: () => Get.offAllNamed(AppRoutes.home),
+                        customBorder: const CircleBorder(),
+                        child: Ink(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            shape: BoxShape.circle,
+                            boxShadow: AppShadows.low,
+                          ),
+                          child: const Icon(Icons.close_rounded, size: 20),
                         ),
-                        child: const Icon(Icons.close_rounded, size: 20),
                       ),
                     ),
                     const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text('ট্রায়াজ ফলাফল',
-                          maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.onBackground)),
+                    Expanded(
+                      child: Text(
+                        'ট্রায়াজ ফলাফল',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.h1,
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 24),
 
                 // ── Band card ────────────────────────────────────────────────
                 TriageResultCard(
@@ -442,7 +444,7 @@ class _ActionCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.lgR,
         border: Border.all(color: border, width: 1.5),
       ),
       child: Column(
@@ -452,84 +454,53 @@ class _ActionCard extends StatelessWidget {
             children: [
               Icon(icon, color: border, size: 18),
               const SizedBox(width: 8),
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: border,
-                      letterSpacing: 0.4)),
-              if (engineResult.referral.isNotEmpty &&
-                  engineResult.referral != 'None') ...[
+              Text(
+                label.toUpperCase(),
+                style: AppTextStyles.overline.copyWith(color: border),
+              ),
+              if (engineResult.referral.isNotEmpty && engineResult.referral != 'None') ...[
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: border.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: AppRadius.pillR,
                   ),
-                  child: Text(engineResult.referral,
-                      style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: border)),
+                  child: Text(
+                    engineResult.referral,
+                    style: AppTextStyles.caption.copyWith(color: border, fontWeight: FontWeight.w700),
+                  ),
                 ),
               ],
             ],
           ),
           if (actionText.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(actionText,
-                style: TextStyle(fontSize: 14, color: textColor, height: 1.6)),
-          ],
-          // Directions to the nearest matching facility (referral cases)
-          if (outcome != TriageOutcome.safe &&
-              engineResult.referral.isNotEmpty &&
-              engineResult.referral != 'None') ...[
             const SizedBox(height: 12),
-            GestureDetector(
-              onTap: _openDirections,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 11),
-                decoration: BoxDecoration(
-                  color: border,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.directions_rounded,
-                        color: Colors.white, size: 18),
-                    SizedBox(width: 8),
-                    Text('নিকটস্থ স্বাস্থ্যকেন্দ্রে পথ দেখুন',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700)),
-                  ],
-                ),
-              ),
-            ),
+            Text(actionText, style: AppTextStyles.body.copyWith(color: textColor)),
+          ],
+          // Nearest referral map (referral cases)
+          if (outcome != TriageOutcome.safe && engineResult.referral.isNotEmpty && engineResult.referral != 'None') ...[
+            const SizedBox(height: 12),
+            ReferralMapWidget(facilityType: engineResult.referral),
           ],
           // Sign-off pending badge
           if (engineResult.signOffPending) ...[
             const SizedBox(height: 10),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
                 color: const Color(0xFFFFF3CD),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: AppRadius.smR,
                 border: Border.all(color: const Color(0xFFD97706)),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.warning_amber_rounded,
-                      size: 14, color: Color(0xFFD97706)),
-                  SizedBox(width: 6),
+                  const Icon(Icons.warning_amber_rounded, size: 14, color: Color(0xFFD97706)),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       'এই নিয়মটি চূড়ান্ত অনুমোদনের অপেক্ষায় আছে।',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF92400E)),
+                      style: AppTextStyles.caption.copyWith(color: const Color(0xFF92400E)),
                     ),
                   ),
                 ],
@@ -539,29 +510,6 @@ class _ActionCard extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  // Opens an external map searching for the nearest facility of the
-  // referred type. Without a facility-coordinate dataset this is a
-  // location-aware search, not turn-by-turn to one exact building.
-  Future<void> _openDirections() async {
-    final r = engineResult.referral.toUpperCase();
-    final query = r.contains('SNCU')
-        ? 'SNCU hospital near me'
-        : (r.contains('DH') || r.contains('DISTRICT'))
-            ? 'District Hospital near me'
-            : r.contains('CHC')
-                ? 'Community Health Centre near me'
-                : r.contains('PHC')
-                    ? 'Primary Health Centre near me'
-                    : 'government hospital near me';
-    final uri = Uri.parse('geo:0,0?q=${Uri.encodeComponent(query)}');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      Get.snackbar('ম্যাপ খোলা যায়নি', 'ম্যাপ অ্যাপ পাওয়া যায়নি',
-          snackPosition: SnackPosition.BOTTOM);
-    }
   }
 }
 
@@ -576,37 +524,24 @@ class _QaSummary extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE0E7FF)),
+        color: AppColors.surface,
+        borderRadius: AppRadius.lgR,
+        boxShadow: AppShadows.low,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('উত্তর সারসংক্ষেপ',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
-                  letterSpacing: 0.5)),
+          Text('উত্তর সারসংক্ষেপ', style: AppTextStyles.overline.copyWith(color: AppColors.primary)),
           const SizedBox(height: 12),
           ...qaPairs.map((qa) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(qa.question,
-                        style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                            height: 1.4)),
-                    const SizedBox(height: 3),
-                    Text(qa.answer,
-                        style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.onBackground)),
-                    const Divider(height: 16, color: Color(0xFFE0E7FF)),
+                    Text(qa.question, style: AppTextStyles.bodySm),
+                    const SizedBox(height: 4),
+                    Text(qa.answer, style: AppTextStyles.labelLg),
+                    const Divider(height: 18, color: Color(0xFFE0E7FF)),
                   ],
                 ),
               )),
@@ -634,41 +569,42 @@ class _DecisionTraceState extends State<_DecisionTrace> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE0E7FF)),
+        color: AppColors.surface,
+        borderRadius: AppRadius.lgR,
+        boxShadow: AppShadows.low,
       ),
       child: Column(
         children: [
-          // Header / toggle
-          GestureDetector(
-            onTap: () => setState(() => _expanded = !_expanded),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const Icon(Icons.account_tree_outlined,
-                      size: 16, color: AppColors.primary),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text('ডিসিশন ট্রেস (অডিট)',
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary)),
-                  ),
-                  Text('${widget.trace.length} নিয়ম',
-                      style: const TextStyle(
-                          fontSize: 11, color: AppColors.textSecondary)),
-                  const SizedBox(width: 6),
-                  Icon(
-                    _expanded
-                        ? Icons.keyboard_arrow_up_rounded
-                        : Icons.keyboard_arrow_down_rounded,
-                    size: 20,
-                    color: AppColors.textSecondary,
-                  ),
-                ],
+          Material(
+            color: Colors.transparent,
+            borderRadius: AppRadius.lgR,
+            child: InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              borderRadius: AppRadius.lgR,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const Icon(Icons.account_tree_outlined,
+                        size: 16, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'ডিসিশন ট্রেস (অডিট)',
+                        style: AppTextStyles.label.copyWith(color: AppColors.primary),
+                      ),
+                    ),
+                    Text('${widget.trace.length} নিয়ম', style: AppTextStyles.caption),
+                    const SizedBox(width: 6),
+                    Icon(
+                      _expanded
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      size: 20,
+                      color: AppColors.textSecondary,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

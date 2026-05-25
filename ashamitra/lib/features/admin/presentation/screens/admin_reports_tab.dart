@@ -5,6 +5,9 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_gradients.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/utils/pdf_helper.dart';
 import '../../../admin/controller/admin_controller.dart';
 import 'admin_report_detail.dart';
@@ -38,13 +41,53 @@ class _AdminReportsTabState extends State<AdminReportsTab> {
               padding: const EdgeInsets.fromLTRB(20, 20, 16, 12),
               child: Row(
                 children: [
-                  const Expanded(
-                    child: Text('Reports',
-                        style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.onBackground)),
+                  Expanded(
+                    child: Text('Reports', style: AppTextStyles.h2),
                   ),
+                  Obx(() {
+                    final activeCount = [
+                      ctrl.selectedWorkerId.value,
+                      ctrl.selectedDistrict.value,
+                      ctrl.selectedBlock.value,
+                    ].where((e) => e != null).length;
+                    return Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        IconButton(
+                          onPressed: () => _openFilterSheet(context, ctrl),
+                          style: IconButton.styleFrom(
+                            backgroundColor: activeCount > 0
+                                ? AppColors.primary.withValues(alpha: 0.12)
+                                : Colors.grey.shade100,
+                            padding: const EdgeInsets.all(10),
+                          ),
+                          icon: const Icon(Icons.filter_alt_rounded,
+                              color: AppColors.primary, size: 20),
+                          tooltip: 'Filter by worker / location',
+                        ),
+                        if (activeCount > 0)
+                          Positioned(
+                            top: 4, right: 4,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: const BoxDecoration(
+                                color: AppColors.accent,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                              child: Text(
+                                '$activeCount',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  }),
+                  const SizedBox(width: 8),
                   Obx(() => IconButton(
                         onPressed: ctrl.filteredReports.isEmpty
                             ? null
@@ -58,7 +101,7 @@ class _AdminReportsTabState extends State<AdminReportsTab> {
                         icon: Icon(Icons.download_rounded,
                             color: ctrl.filteredReports.isEmpty
                                 ? AppColors.textSecondary
-                                : Colors.white,
+                                : AppColors.onPrimary,
                             size: 20),
                         tooltip: 'Download PDF',
                       )),
@@ -151,10 +194,7 @@ class _AdminReportsTabState extends State<AdminReportsTab> {
                             color: AppColors.textSecondary
                                 .withValues(alpha: 0.4)),
                         const SizedBox(height: 12),
-                        Text('admin_no_reports'.tr,
-                            style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 14)),
+                        Text('admin_no_reports'.tr, style: AppTextStyles.bodySm),
                       ],
                     ),
                   );
@@ -203,7 +243,8 @@ class _AdminReportsTabState extends State<AdminReportsTab> {
 
   Future<void> _downloadPdf(List<dynamic> reports) async {
     try {
-      final doc = pw.Document();
+      final theme = await PdfHelper.bengaliTheme();
+      final doc = pw.Document(theme: theme);
       doc.addPage(
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
@@ -261,6 +302,120 @@ class _AdminReportsTabState extends State<AdminReportsTab> {
       return iso;
     }
   }
+
+  void _openFilterSheet(BuildContext context, AdminController ctrl) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => SafeArea(
+        child: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: Obx(() {
+            final workers = ctrl.ashaWorkers;
+            return SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40, height: 4, margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Expanded(child: Text('Filter reports', style: AppTextStyles.h2)),
+                      if (ctrl.selectedWorkerId.value != null ||
+                          ctrl.selectedDistrict.value != null ||
+                          ctrl.selectedBlock.value   != null)
+                        TextButton.icon(
+                          onPressed: () { ctrl.clearLocationFilters(); Get.back(); },
+                          icon: const Icon(Icons.clear_rounded, size: 16),
+                          label: const Text('Clear'),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── Worker ─────────────────────────────────────────────
+                  Text('ASHA WORKER', style: AppTextStyles.overline),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String?>(
+                    initialValue: ctrl.selectedWorkerId.value,
+                    isExpanded: true,
+                    decoration: const InputDecoration(),
+                    items: [
+                      const DropdownMenuItem<String?>(value: null, child: Text('সব ASHA — All workers')),
+                      for (final w in workers)
+                        DropdownMenuItem<String?>(
+                          value: w.id,
+                          child: Text('${w.name} · ${w.phone}', overflow: TextOverflow.ellipsis),
+                        ),
+                    ],
+                    onChanged: (v) => ctrl.selectedWorkerId.value = v,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── District ──────────────────────────────────────────
+                  Text('DISTRICT', style: AppTextStyles.overline),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String?>(
+                    initialValue: ctrl.selectedDistrict.value,
+                    isExpanded: true,
+                    decoration: const InputDecoration(),
+                    items: [
+                      const DropdownMenuItem<String?>(value: null, child: Text('সব জেলা — All districts')),
+                      for (final d in ctrl.districts)
+                        DropdownMenuItem<String?>(value: d, child: Text(d)),
+                    ],
+                    onChanged: (v) => ctrl.selectedDistrict.value = v,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── Block ─────────────────────────────────────────────
+                  Text('BLOCK', style: AppTextStyles.overline),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String?>(
+                    initialValue: ctrl.selectedBlock.value,
+                    isExpanded: true,
+                    decoration: const InputDecoration(),
+                    items: [
+                      const DropdownMenuItem<String?>(value: null, child: Text('সব ব্লক — All blocks')),
+                      for (final b in ctrl.blocks)
+                        DropdownMenuItem<String?>(value: b, child: Text(b)),
+                    ],
+                    onChanged: (v) => ctrl.selectedBlock.value = v,
+                  ),
+                  const SizedBox(height: 24),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () { ctrl.applyLocationFilters(); Get.back(); },
+                      icon: const Icon(Icons.check_rounded),
+                      label: const Text('Apply filters'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
 }
 
 // ── Filter chip ────────────────────────────────────────────────────────────────
@@ -279,23 +434,27 @@ class _FilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = color ?? AppColors.primary;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected ? c : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-              color: selected ? c : const Color(0xFFE0E7FF)),
+    return Material(
+      color: selected ? c : AppColors.surface,
+      borderRadius: AppRadius.pillR,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.pillR,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: selected ? c : AppColors.surface,
+            borderRadius: AppRadius.pillR,
+            border: Border.all(
+                color: selected ? c : AppColors.cardBorder),
+          ),
+          child: Text(label,
+              style: AppTextStyles.label.copyWith(
+                color: selected ? AppColors.onPrimary : AppColors.textSecondary,
+              )),
         ),
-        child: Text(label,
-            style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: selected ? Colors.white : AppColors.textSecondary)),
       ),
     );
   }
@@ -313,10 +472,9 @@ class _SummaryChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(10)),
+          borderRadius: AppRadius.smR),
       child: Text(label,
-          style: TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+          style: AppTextStyles.overline.copyWith(color: color)),
     );
   }
 }
@@ -346,83 +504,72 @@ class _ReportCard extends StatelessWidget {
           .format(DateTime.parse(r['createdAt']?.toString() ?? ''));
     } catch (_) {}
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withValues(alpha: 0.25)),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 2))
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  shape: BoxShape.circle),
-              child: Center(
-                child: Text(
-                  band.isNotEmpty ? band[0] : '?',
-                  style: TextStyle(
+    return Material(
+      color: AppColors.surface,
+      borderRadius: AppRadius.lgR,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.lgR,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: AppRadius.lgR,
+            border: Border.all(color: color.withValues(alpha: 0.25)),
+            boxShadow: AppShadows.low,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    shape: BoxShape.circle),
+                child: Center(
+                  child: Text(
+                    band.isNotEmpty ? band[0] : '?',
+                    style: AppTextStyles.label.copyWith(
                       color: color,
                       fontWeight: FontWeight.bold,
-                      fontSize: 14),
+                    ),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (caseLabel.isNotEmpty)
-                    Text(caseLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.onBackground)),
-                  if (patientName.isNotEmpty)
-                    Text(patientName,
-                        style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary)),
-                  if ((r['ashaName']?.toString() ?? '').isNotEmpty)
-                    Text('ASHA: ${r['ashaName']}',
-                        style: const TextStyle(
-                            fontSize: 10,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (caseLabel.isNotEmpty)
+                      Text(caseLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.label),
+                    if (patientName.isNotEmpty)
+                      Text(patientName, style: AppTextStyles.caption),
+                    if ((r['ashaName']?.toString() ?? '').isNotEmpty)
+                      Text('ASHA: ${r['ashaName']}',
+                          style: AppTextStyles.caption.copyWith(
                             color: AppColors.primary,
-                            fontWeight: FontWeight.w600)),
-                  Text(fmtDate,
-                      style: const TextStyle(
-                          fontSize: 10, color: AppColors.textSecondary)),
-                ],
+                            fontWeight: FontWeight.w600,
+                          )),
+                    Text(fmtDate, style: AppTextStyles.caption),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8)),
-              child: Text(band,
-                  style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: color)),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: AppRadius.smR),
+                child: Text(band,
+                    style: AppTextStyles.overline.copyWith(color: color)),
+              ),
+            ],
+          ),
         ),
       ),
     );

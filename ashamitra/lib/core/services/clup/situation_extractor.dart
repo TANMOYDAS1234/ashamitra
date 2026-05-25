@@ -33,6 +33,10 @@ class SituationExtractor {
         'দুধ খাইতে পারছে না', 'দুধ খাওয়া বন্ধ',
         // Sundarbans
         'দুধ খাইতেছে নাই', 'দুধ টানছে নাই',
+        // Extra synonyms
+        'চুষছে না', 'চুষতে পারছে না', 'স্তন ধরছে না', 'স্তন নিচ্ছে না',
+        'মুখে নিচ্ছে না', 'বুক ছাড়ছে না', 'দুধ গিলছে না', 'খাওয়া ছেড়ে দিয়েছে',
+        'chusna nahi', 'stan nahi pakad raha', 'muh mein nahi le raha',
         // Hindi / Bhojpuri
         'doodh nahi pi raha', 'doodh nahi', 'dudh nahi pita',
         'stan nahi le raha',
@@ -120,6 +124,10 @@ class SituationExtractor {
         'নড়তেছে না', 'ঢিলা হইয়া গেছে', 'সাড়া দিতেছে না',
         // Cooch Behar
         'নড়াচড়া নাই', 'ঢিলা পড়ছে',
+        // Extra synonyms
+        'চোখ খুলছে না', 'ঘুম থেকে উঠছে না', 'একদম চুপ', 'কাঁদছে না',
+        'সাড়া দিচ্ছে না', 'চোখ বন্ধ', 'নিশ্চল', 'নিস্প্রাণের মতো',
+        'aankhein nahi khul rahi', 'neend se nahi uth raha', 'bilkul chup',
         // Hindi / Bhojpuri
         'hilta nahi', 'dhila ho gaya', 'kamzor ho gaya',
         'response nahi de raha',
@@ -155,6 +163,8 @@ class SituationExtractor {
         // Standard Bengali
         'পাঁচ দিন', '৫ দিন', 'পাঁচদিন', 'অনেকদিন জ্বর', 'দীর্ঘদিন জ্বর',
         'পাঁচ দিনের বেশি', 'এক সপ্তাহ জ্বর',
+        'ছয় দিন জ্বর', '৬ দিন জ্বর', 'সাত দিন জ্বর', '৭ দিন জ্বর',
+        'এক সপ্তাহ ধরে জ্বর', 'কয়েকদিন ধরে জ্বর', 'বহুদিন জ্বর',
         // Rarhi
         'পাঁচ দিন ধরে জ্বর', 'পাঁচ দিন হইছে জ্বর', 'অনেকদিন ধরে জ্বর',
         'পাঁচ দিন জ্বর আছে',
@@ -266,6 +276,9 @@ class SituationExtractor {
       _SymptomRule(triggers: [
         // Standard Bengali
         'মাথা ব্যথা', 'মাথা ধরেছে', 'রক্তচাপ', 'বিপি', 'মাথা ব্যাথা',
+        'মাথা ভারী', 'মাথা ভার লাগছে', 'বুক ধড়ফড়', 'বুক ধড়ফড় করছে',
+        'ঘাড় ব্যথা', 'ঘাড়ে ব্যথা', 'চোখে ব্যথা', 'কানে শোঁ শোঁ',
+        'bp বেশি', 'প্রেশার বেশি', 'প্রেশার হাই',
         // Rarhi dialects
         'মাথা ব্যথা করছে', 'মাথা ধরছে', 'মাথায় ব্যথা', 'মাথা ব্যথা হইছে',
         'মাথা ব্যথা করতেছে', 'মাথা ধরছে গো',
@@ -369,6 +382,8 @@ class SituationExtractor {
         // Standard Bengali
         'চোখে ঝাপসা', 'ঝাপসা দেখছে', 'মাথা ঘুরছে', 'চোখ ঝাপসা',
         'মাথা ঘোরা', 'চোখে অন্ধকার',
+        'মাথা ঘুরে পড়ে গেছে', 'চোখে আলো সহ্য হচ্ছে না', 'চোখে ঝিলিক',
+        'দেখতে পাচ্ছে না', 'চোখে সমস্যা', 'মাথা ঘুরে যাচ্ছে',
         // Rarhi
         'মাথা ঘুরাইতেছে', 'চোখে ঝাপসা লাগছে', 'মাথা ঘুরছে গো',
         'চোখে কম দেখছে', 'মাথা ঘুরতেছে',
@@ -482,6 +497,9 @@ class SituationExtractor {
       _SymptomRule(triggers: [
         // Standard Bengali
         'দুর্বল', 'মাথা ঘুরছে', 'ফ্যাকাশে', 'অনেক দুর্বল', 'শক্তি নেই',
+        'রক্তশূন্য', 'রক্তস্বল্পতা', 'হাত-পা ঠান্ডা', 'হাত পা ঠান্ডা',
+        'ফ্যাকাশে ঠোঁট', 'ঠোঁট সাদা', 'নখ সাদা', 'চোখ সাদা',
+        'রক্ত কম', 'অ্যানিমিয়া', 'anemia',
         // Rarhi
         'দুর্বল হয়ে গেছে', 'মাথা ঘুরাইতেছে', 'ফ্যাকাশে হয়ে গেছে',
         'দুর্বল লাগছে', 'শক্তি নাই',
@@ -609,6 +627,26 @@ class SituationExtractor {
     ],
   };
 
+  // Negative phrases: if any matches, record answer=false for that question.
+  // Checked AFTER positive so a positive match always wins.
+  static const _negativeMap = <String, List<String>>{
+    'n1': ['দুধ খাচ্ছে', 'দুধ টানছে', 'ভালো খাচ্ছে', 'খাচ্ছে ঠিকঠাক',
+           'feeding well', 'breastfeeding well'],
+    'n2': ['জ্বর নেই', 'গা গরম নেই', 'জ্বর হয়নি', 'no fever'],
+    'n3': ['শ্বাস ঠিক আছে', 'শ্বাস স্বাভাবিক', 'breathing normal'],
+    'n5': ['নড়ছে', 'সাড়া দিচ্ছে', 'সক্রিয়', 'active', 'moving well'],
+    'p1': ['মাথা ব্যথা নেই', 'বিপি ঠিক আছে', 'bp normal', 'no headache'],
+    'p2': ['ফোলা নেই', 'পা ফোলেনি', 'no swelling'],
+    'p3': ['রক্তপাত নেই', 'রক্ত পড়ছে না', 'পেট ব্যথা নেই', 'no bleeding'],
+    'p4': ['বাচ্চা নড়ছে', 'নড়াচড়া আছে', 'baby moving', 'movement normal'],
+    'p6': ['মাথা ঘুরছে না', 'চোখ ঠিক আছে', 'no dizziness', 'vision clear'],
+    'pp1': ['রক্তপাত নেই', 'রক্ত পড়ছে না', 'no bleeding'],
+    'pp2': ['জ্বর নেই', 'no fever'],
+    'c1': ['জ্বর নেই', 'জ্বর ছিল না', 'no fever'],
+    'c3': ['বমি নেই', 'পাতলা পায়খানা নেই', 'no diarrhoea', 'no vomiting'],
+    'c5': ['পানিশূন্য নয়', 'চোখ ঠিক আছে', 'not dehydrated'],
+  };
+
   SituationExtraction extract({
     required String situation,
     required String moduleId,
@@ -622,6 +660,7 @@ class SituationExtractor {
     final preAnswers = <String, bool>{};
     final extractedSymptoms = <String>[];
 
+    // Positive matching
     for (final rule in rules) {
       for (final trigger in rule.triggers) {
         if (text.contains(trigger.toLowerCase())) {
@@ -629,6 +668,18 @@ class SituationExtractor {
           if (!extractedSymptoms.contains(rule.label)) {
             extractedSymptoms.add(rule.label);
           }
+          break;
+        }
+      }
+    }
+
+    // Negative matching — only fills gaps not already set by positive match
+    final negRules = _negativeMap;
+    for (final entry in negRules.entries) {
+      if (preAnswers.containsKey(entry.key)) continue;
+      for (final phrase in entry.value) {
+        if (text.contains(phrase.toLowerCase())) {
+          preAnswers[entry.key] = false;
           break;
         }
       }

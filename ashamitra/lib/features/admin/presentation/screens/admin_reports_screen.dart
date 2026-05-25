@@ -5,7 +5,11 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_gradients.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/utils/pdf_helper.dart';
+import '../../../../shared/components/app_header.dart';
 import '../../../admin/controller/admin_controller.dart';
 
 class AdminReportsScreen extends StatelessWidget {
@@ -22,75 +26,19 @@ class AdminReportsScreen extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              // ── Header ──────────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      onTap: Get.back,
-                      child: Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
-                              blurRadius: 8,
-                            )
-                          ],
-                        ),
-                        child: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Text(
-                        'admin_reports'.tr,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.onBackground,
-                        ),
-                      ),
-                    ),
-                    // PDF download
-                    Obx(() => GestureDetector(
-                          onTap: ctrl.filteredReports.isEmpty
-                              ? null
-                              : () => _downloadPdf(ctrl.filteredReports.toList()),
-                          child: Opacity(
-                            opacity: ctrl.filteredReports.isEmpty ? 0.5 : 1.0,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.download_rounded, color: Colors.white, size: 16),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    'PDF',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        )),
-                  ],
-                ),
+              AppHeader(
+                title: 'admin_reports'.tr,
+                actions: [
+                  Obx(() => HeaderActionPill(
+                        icon: Icons.download_rounded,
+                        label: 'PDF',
+                        onTap: ctrl.filteredReports.isEmpty
+                            ? () {}
+                            : () => _downloadPdf(ctrl.filteredReports.toList()),
+                      )),
+                ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 4),
 
               // ── Filter bar ───────────────────────────────────────
               Obx(() => SingleChildScrollView(
@@ -109,8 +57,7 @@ class AdminReportsScreen extends StatelessWidget {
                         if (ctrl.filterMode.value != 'all' && ctrl.filterDate.value != null)
                           Text(
                             _filterLabel(ctrl.filterMode.value, ctrl.filterDate.value!),
-                            style: const TextStyle(
-                              fontSize: 11,
+                            style: AppTextStyles.caption.copyWith(
                               color: AppColors.primary,
                               fontWeight: FontWeight.w600,
                             ),
@@ -146,10 +93,7 @@ class AdminReportsScreen extends StatelessWidget {
                   }
                   if (ctrl.filteredReports.isEmpty) {
                     return Center(
-                      child: Text(
-                        'admin_no_reports'.tr,
-                        style: const TextStyle(color: AppColors.textSecondary),
-                      ),
+                      child: Text('admin_no_reports'.tr, style: AppTextStyles.bodySm),
                     );
                   }
                   return RefreshIndicator(
@@ -181,7 +125,7 @@ class AdminReportsScreen extends StatelessWidget {
 
   Future<void> _pickDate(BuildContext context, AdminController ctrl, String mode) async {
     final now = DateTime.now();
-    
+
     // Configures calendar directly to year mode if tracking years
     final initialView = mode == 'year' ? DatePickerMode.year : DatePickerMode.day;
 
@@ -202,7 +146,8 @@ class AdminReportsScreen extends StatelessWidget {
 
   Future<void> _downloadPdf(List<dynamic> reports) async {
     try {
-      final doc = pw.Document();
+      final theme = await PdfHelper.bengaliTheme();
+      final doc = pw.Document(theme: theme);
       doc.addPage(
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
@@ -260,23 +205,25 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? AppColors.primary : const Color(0xFFE0E7FF)),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : AppColors.textSecondary,
+    return Material(
+      color: selected ? AppColors.primary : AppColors.surface,
+      borderRadius: AppRadius.pillR,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.pillR,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.primary : AppColors.surface,
+            borderRadius: AppRadius.pillR,
+            border: Border.all(color: selected ? AppColors.primary : AppColors.cardBorder),
+          ),
+          child: Text(
+            label,
+            style: AppTextStyles.label.copyWith(
+              color: selected ? AppColors.onPrimary : AppColors.textSecondary,
+            ),
           ),
         ),
       ),
@@ -296,11 +243,11 @@ class _SummaryChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: AppRadius.smR,
       ),
       child: Text(
         label,
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color),
+        style: AppTextStyles.overline.copyWith(color: color),
       ),
     );
   }
@@ -339,12 +286,10 @@ class _ReportCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        color: AppColors.surface,
+        borderRadius: AppRadius.lgR,
         border: Border.all(color: color.withValues(alpha: 0.25)),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))
-        ],
+        boxShadow: AppShadows.low,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -356,7 +301,10 @@ class _ReportCard extends StatelessWidget {
             child: Center(
               child: Text(
                 bandChar,
-                style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14),
+                style: AppTextStyles.label.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -370,7 +318,7 @@ class _ReportCard extends StatelessWidget {
                     caseLabel,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.onBackground),
+                    style: AppTextStyles.label,
                   ),
                 const SizedBox(height: 2),
                 if (ashaName.isNotEmpty)
@@ -378,16 +326,16 @@ class _ReportCard extends StatelessWidget {
                     'ASHA: $ashaName',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                    style: AppTextStyles.caption,
                   ),
                 if (patientName.isNotEmpty)
                   Text(
                     '${'admin_patient'.tr}: $patientName',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                    style: AppTextStyles.caption,
                   ),
-                Text(fmtDate, style: const TextStyle(fontSize: 10, color: AppColors.textLight)),
+                Text(fmtDate, style: AppTextStyles.caption.copyWith(color: AppColors.textLight)),
               ],
             ),
           ),
@@ -396,11 +344,11 @@ class _ReportCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: AppRadius.smR,
             ),
             child: Text(
               band,
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color),
+              style: AppTextStyles.overline.copyWith(color: color),
             ),
           ),
         ],

@@ -3,6 +3,9 @@ import 'package:get/get.dart';
 import '../../controller/auth_controller.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_gradients.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/widgets/app_button.dart';
 
 class OtpScreen extends StatefulWidget {
@@ -31,7 +34,6 @@ class _OtpScreenState extends State<OtpScreen> {
       _phone    = args?.toString() ?? '';
       _pilotOtp = null;
     }
-    // Auto-fill boxes if pilot OTP received
     if (_pilotOtp != null && _pilotOtp!.length == 6) {
       for (int i = 0; i < 6; i++) {
         _boxes[i].text = _pilotOtp![i];
@@ -42,8 +44,12 @@ class _OtpScreenState extends State<OtpScreen> {
 
   @override
   void dispose() {
-    for (final c in _boxes) c.dispose();
-    for (final n in _nodes) n.dispose();
+    for (final c in _boxes) {
+      c.dispose();
+    }
+    for (final n in _nodes) {
+      n.dispose();
+    }
     super.dispose();
   }
 
@@ -70,45 +76,43 @@ class _OtpScreenState extends State<OtpScreen> {
                 const SizedBox(height: 24),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: GestureDetector(
-                    onTap: () => Get.back(),
-                    child: Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                              color: Colors.black.withOpacity(0.06), blurRadius: 8)
-                        ],
+                  child: Material(
+                    color: AppColors.surface,
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      onTap: () => Get.back(),
+                      customBorder: const CircleBorder(),
+                      child: Ink(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          shape: BoxShape.circle,
+                          boxShadow: AppShadows.low,
+                        ),
+                        child: const Icon(Icons.arrow_back_ios_new_rounded,
+                            size: 18, color: AppColors.onBackground),
                       ),
-                      child: const Icon(Icons.arrow_back_ios_new_rounded,
-                          size: 18, color: AppColors.onBackground),
                     ),
                   ),
                 ),
                 const SizedBox(height: 32),
                 Container(
-                  width: 68,
-                  height: 68,
+                  width: 72,
+                  height: 72,
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.10),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.sms_rounded, size: 32, color: AppColors.primary),
+                  child: const Icon(Icons.sms_rounded, size: 34, color: AppColors.primary),
                 ),
-                const SizedBox(height: 16),
-                Text('otp_title'.tr,
-                    style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.onBackground)),
+                const SizedBox(height: 18),
+                Text('otp_title'.tr, style: AppTextStyles.h1),
                 const SizedBox(height: 6),
                 Text(
                   'otp_subtitle'.trParams({'phone': _phone}),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                  style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 20),
                 // ── Pilot mode OTP banner ────────────────────────────────
@@ -118,7 +122,7 @@ class _OtpScreenState extends State<OtpScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFFF3CD),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: AppRadius.lgR,
                       border: Border.all(color: const Color(0xFFD97706)),
                     ),
                     child: Row(
@@ -128,13 +132,19 @@ class _OtpScreenState extends State<OtpScreen> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Pilot Mode — OTP',
-                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-                                    color: Color(0xFF92400E), letterSpacing: 0.5)),
+                            Text(
+                              'PILOT MODE — OTP',
+                              style: AppTextStyles.overline.copyWith(color: const Color(0xFF92400E)),
+                            ),
                             const SizedBox(height: 2),
-                            Text(_pilotOtp!,
-                                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900,
-                                    color: Color(0xFF92400E), letterSpacing: 8)),
+                            Text(
+                              _pilotOtp!,
+                              style: AppTextStyles.display.copyWith(
+                                fontSize: 28,
+                                color: const Color(0xFF92400E),
+                                letterSpacing: 8,
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -144,14 +154,9 @@ class _OtpScreenState extends State<OtpScreen> {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                          color: AppColors.primary.withOpacity(0.08),
-                          blurRadius: 20,
-                          offset: const Offset(0, 6))
-                    ],
+                    color: AppColors.surface,
+                    borderRadius: AppRadius.xlR,
+                    boxShadow: AppShadows.mid,
                   ),
                   child: Column(
                     children: [
@@ -188,8 +193,8 @@ class _OtpScreenState extends State<OtpScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFFEBEB),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: AppColors.emergencyRed.withOpacity(0.4)),
+                            borderRadius: AppRadius.mdR,
+                            border: Border.all(color: AppColors.emergencyRed.withValues(alpha: 0.40)),
                           ),
                           child: Row(
                             children: [
@@ -197,11 +202,10 @@ class _OtpScreenState extends State<OtpScreen> {
                                   size: 16, color: AppColors.emergencyRed),
                               const SizedBox(width: 8),
                               Expanded(
-                                child: Text(_ctrl.errorMsg.value,
-                                    style: const TextStyle(
-                                        fontSize: 12,
-                                        color: AppColors.emergencyRed,
-                                        fontWeight: FontWeight.w500)),
+                                child: Text(
+                                  _ctrl.errorMsg.value,
+                                  style: AppTextStyles.bodySm.copyWith(color: AppColors.emergencyRed),
+                                ),
                               ),
                             ],
                           ),
@@ -209,28 +213,26 @@ class _OtpScreenState extends State<OtpScreen> {
                       }),
                       const SizedBox(height: 4),
                       Obx(() => TextButton(
-                        onPressed: _ctrl.isLoading.value
-                            ? null
-                            : () async {
-                                _ctrl.errorMsg.value = '';
-                                await _ctrl.login(_phone);
-                                if (_ctrl.errorMsg.value.isEmpty) {
-                                  Get.snackbar(
-                                    'OTP পাঠানো হয়েছে',
-                                    '$_phone নম্বরে নতুন OTP পাঠানো হয়েছে।',
-                                    snackPosition: SnackPosition.BOTTOM,
-                                    backgroundColor: AppColors.safeGreen,
-                                    colorText: Colors.white,
-                                    margin: const EdgeInsets.all(16),
-                                    borderRadius: 12,
-                                    duration: const Duration(seconds: 3),
-                                  );
-                                }
-                              },
-                        child: Text('resend_otp'.tr,
-                            style: const TextStyle(
-                                color: AppColors.primary, fontWeight: FontWeight.w600)),
-                      )),
+                            onPressed: _ctrl.isLoading.value
+                                ? null
+                                : () async {
+                                    _ctrl.errorMsg.value = '';
+                                    await _ctrl.login(_phone);
+                                    if (_ctrl.errorMsg.value.isEmpty) {
+                                      Get.snackbar(
+                                        'OTP পাঠানো হয়েছে',
+                                        '$_phone নম্বরে নতুন OTP পাঠানো হয়েছে।',
+                                        snackPosition: SnackPosition.BOTTOM,
+                                        backgroundColor: AppColors.safeGreen,
+                                        colorText: Colors.white,
+                                        margin: const EdgeInsets.all(16),
+                                        borderRadius: 12,
+                                        duration: const Duration(seconds: 3),
+                                      );
+                                    }
+                                  },
+                            child: Text('resend_otp'.tr),
+                          )),
                     ],
                   ),
                 ),
@@ -249,15 +251,16 @@ class _OtpBox extends StatelessWidget {
   final FocusNode focusNode;
   final ValueChanged<String> onChanged;
 
-  const _OtpBox(
-      {required this.controller,
-      required this.focusNode,
-      required this.onChanged});
+  const _OtpBox({
+    required this.controller,
+    required this.focusNode,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 52,
+      height: 56,
       child: TextField(
         controller: controller,
         focusNode: focusNode,
@@ -265,24 +268,23 @@ class _OtpBox extends StatelessWidget {
         textAlign: TextAlign.center,
         keyboardType: TextInputType.number,
         onChanged: onChanged,
-        style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: AppColors.onBackground),
+        style: AppTextStyles.h2,
         decoration: InputDecoration(
           counterText: '',
           filled: true,
           fillColor: const Color(0xFFF5F7FF),
           border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE0E7FF))),
+            borderRadius: AppRadius.mdR,
+            borderSide: const BorderSide(color: Color(0xFFE0E7FF)),
+          ),
           enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE0E7FF))),
+            borderRadius: AppRadius.mdR,
+            borderSide: const BorderSide(color: Color(0xFFE0E7FF)),
+          ),
           focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide:
-                  const BorderSide(color: AppColors.primary, width: 2)),
+            borderRadius: AppRadius.mdR,
+            borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          ),
           contentPadding: EdgeInsets.zero,
         ),
       ),

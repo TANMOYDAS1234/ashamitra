@@ -3,6 +3,9 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_gradients.dart';
+import '../../../../core/theme/app_radius.dart';
+import '../../../../core/theme/app_shadows.dart';
+import '../../../../core/theme/app_text_styles.dart';
 import '../../../../features/auth/controller/auth_controller.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../../../admin/controller/admin_controller.dart';
@@ -58,14 +61,11 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('admin_panel'.tr,
-                              style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.onBackground)),
-                          Obx(() => Text(auth.user.value?.name ?? 'Admin',
-                              style: const TextStyle(
-                                  fontSize: 12, color: AppColors.textSecondary))),
+                          Text('admin_panel'.tr, style: AppTextStyles.h3),
+                          Obx(() => Text(
+                                auth.user.value?.name ?? 'Admin',
+                                style: AppTextStyles.caption,
+                              )),
                         ],
                       ),
                     ),
@@ -99,11 +99,7 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
                 const SizedBox(height: 28),
 
                 // ── Recent reports ───────────────────────────────
-                const Text('Recent Reports',
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.onBackground)),
+                Text('Recent Reports', style: AppTextStyles.label),
                 const SizedBox(height: 12),
                 Obx(() {
                   if (ctrl.isLoading.value) {
@@ -113,8 +109,7 @@ class _AdminOverviewTabState extends State<AdminOverviewTab> {
                   }
                   if (ctrl.reports.isEmpty) {
                     return Center(
-                      child: Text('admin_no_reports'.tr,
-                          style: const TextStyle(color: AppColors.textSecondary)),
+                      child: Text('admin_no_reports'.tr, style: AppTextStyles.bodySm),
                     );
                   }
                   final recent = ctrl.reports.take(5).toList();
@@ -148,14 +143,9 @@ class _StatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-              color: color.withValues(alpha: 0.06),
-              blurRadius: 20,
-              offset: const Offset(0, 8))
-        ],
+        color: AppColors.surface,
+        borderRadius: AppRadius.xlR,
+        boxShadow: AppShadows.tinted(color),
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -166,25 +156,21 @@ class _StatTile extends StatelessWidget {
             padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10)),
+                borderRadius: AppRadius.smR),
             child: Icon(icon, color: color, size: 18),
           ),
           const Spacer(),
           Text(value,
-              style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: color,
-                  height: 1.1)),
+              style: AppTextStyles.h2.copyWith(
+                color: color,
+                fontWeight: FontWeight.w800,
+                height: 1.1,
+              )),
           const SizedBox(height: 2),
           Text(label,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary,
-                  height: 1.3)),
+              style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -217,8 +203,8 @@ class _RecentReportCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        color: AppColors.surface,
+        borderRadius: AppRadius.lgR,
         border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
@@ -230,10 +216,7 @@ class _RecentReportCard extends StatelessWidget {
                 color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
             child: Center(
               child: Text(band.isNotEmpty ? band[0] : '?',
-                  style: TextStyle(
-                      color: color,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13)),
+                  style: AppTextStyles.label.copyWith(color: color)),
             ),
           ),
           const SizedBox(width: 10),
@@ -245,20 +228,13 @@ class _RecentReportCard extends StatelessWidget {
                   Text(caseLabel,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.onBackground)),
+                      style: AppTextStyles.label),
                 if (patientName.isNotEmpty)
-                  Text(patientName,
-                      style: const TextStyle(
-                          fontSize: 11, color: AppColors.textSecondary)),
+                  Text(patientName, style: AppTextStyles.caption),
               ],
             ),
           ),
-          Text(fmtDate,
-              style: const TextStyle(
-                  fontSize: 10, color: AppColors.textSecondary)),
+          Text(fmtDate, style: AppTextStyles.caption),
         ],
       ),
     );

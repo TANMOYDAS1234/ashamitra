@@ -52,7 +52,7 @@ class AppButton extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: color != null
-                ? [color!, color!.withOpacity(0.85)]
+                ? [color!, color!.withValues(alpha: 0.85)]
                 : [AppColors.primary, AppColors.purple],
             begin: Alignment.centerLeft,
             end: Alignment.centerRight,
@@ -60,7 +60,7 @@ class AppButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-              color: (color ?? AppColors.primary).withOpacity(0.35),
+              color: (color ?? AppColors.primary).withValues(alpha: 0.35),
               blurRadius: 16,
               offset: const Offset(0, 6),
             ),

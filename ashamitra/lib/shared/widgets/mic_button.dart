@@ -72,7 +72,7 @@ class _MicButtonState extends State<MicButton>
                 color: (widget.isListening
                         ? AppColors.safeGreen
                         : AppColors.primary)
-                    .withOpacity(0.4),
+                    .withValues(alpha: 0.4),
                 blurRadius: 20,
                 offset: const Offset(0, 6),
               ),

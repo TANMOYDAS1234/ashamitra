@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../app/routes.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_radius.dart';
+import '../../core/theme/app_shadows.dart';
+import '../../core/theme/app_text_styles.dart';
 
 class BottomNav extends StatelessWidget {
   final int currentIndex;
@@ -11,21 +14,14 @@ class BottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.08),
-            blurRadius: 20,
-            offset: const Offset(0, -4),
-          ),
-        ],
+        color: AppColors.surface,
+        boxShadow: AppShadows.high,
       ),
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 60,
+          height: 68,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               _NavItem(
@@ -35,7 +31,7 @@ class BottomNav extends StatelessWidget {
                 onTap: () => Get.offAllNamed(AppRoutes.home),
               ),
               _NavItem(
-                icon: Icons.people_rounded,
+                icon: Icons.people_alt_rounded,
                 label: 'patients'.tr,
                 selected: currentIndex == 1,
                 onTap: () => Get.offAllNamed(AppRoutes.patientList),
@@ -76,32 +72,51 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = selected ? AppColors.primary : const Color(0xFF9CA3AF);
+
     return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon,
-                color: selected ? AppColors.primary : const Color(0xFF9CA3AF),
-                size: 22),
-            const SizedBox(height: 3),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                label,
-                maxLines: 1,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: selected ? AppColors.primary : const Color(0xFF9CA3AF),
-                  fontWeight:
-                      selected ? FontWeight.w600 : FontWeight.normal,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: AppRadius.mdR,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Animated pill behind active icon — soft indigo→accent gradient on active.
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 240),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 5),
+                  decoration: BoxDecoration(
+                    gradient: selected
+                        ? LinearGradient(
+                            colors: [
+                              AppColors.primary.withValues(alpha: 0.14),
+                              AppColors.accent.withValues(alpha: 0.10),
+                            ],
+                          )
+                        : null,
+                    borderRadius: AppRadius.pillR,
+                  ),
+                  child: Icon(icon, color: color, size: 22),
                 ),
-              ),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption.copyWith(
+                    color: color,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -115,27 +130,27 @@ class _VoiceNavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Center(
-          child: Container(
-            width: 46,
-            height: 46,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [AppColors.primary, AppColors.purple],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+      child: Center(
+        child: Material(
+          shape: const CircleBorder(),
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            customBorder: const CircleBorder(),
+            child: Ink(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  colors: [AppColors.primary, AppColors.purple],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: AppShadows.tinted(AppColors.primary, strength: 2),
               ),
-              boxShadow: [
-                BoxShadow(
-                    color: Color(0x554F46E5),
-                    blurRadius: 10,
-                    offset: Offset(0, 3)),
-              ],
+              child: const Icon(Icons.mic_rounded, color: Colors.white, size: 24),
             ),
-            child: const Icon(Icons.mic_rounded, color: Colors.white, size: 22),
           ),
         ),
       ),

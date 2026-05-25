@@ -27,10 +27,10 @@ class EmergencyButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: btnColor.withOpacity(0.2)),
+          border: Border.all(color: btnColor.withValues(alpha: 0.2)),
           boxShadow: [
             BoxShadow(
-              color: btnColor.withOpacity(0.10),
+              color: btnColor.withValues(alpha: 0.10),
               blurRadius: 16,
               offset: const Offset(0, 4),
             ),
@@ -42,7 +42,7 @@ class EmergencyButton extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: btnColor.withOpacity(0.1),
+                color: btnColor.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: btnColor, size: 24),
@@ -64,7 +64,7 @@ class EmergencyButton extends StatelessWidget {
               ),
             ),
             Icon(Icons.arrow_forward_ios_rounded,
-                color: btnColor.withOpacity(0.5), size: 16),
+                color: btnColor.withValues(alpha: 0.5), size: 16),
           ],
         ),
       ),

@@ -15,6 +15,10 @@ class ApiService {
 
   static String? _token;
 
+  /// Read-only access to the current JWT for services that need to build
+  /// custom requests (e.g. NotificationController). Null if not logged in.
+  static String? get token => _token;
+
   static void setToken(String token) {
     _token = token;
     LocalStorageService.set('jwt_token', token);
@@ -105,17 +109,16 @@ class ApiService {
 
   // ── Patients ───────────────────────────────────────────────────────────────
 
+  /// Throws on failure so the caller can distinguish "offline / cold-start" from
+  /// "user has zero patients". A return value of [] is a real empty state, not
+  /// a swallowed error. Uses a 45s timeout to survive Render free-tier cold-start.
   static Future<List<dynamic>> getPatients() async {
-    try {
-      final res = await http
-          .get(Uri.parse('$baseUrl/patients'), headers: _headers)
-          .timeout(const Duration(seconds: 15));
-      _guard(res.statusCode);
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
-      return body['data'] as List? ?? [];
-    } catch (_) {
-      return [];
-    }
+    final res = await http
+        .get(Uri.parse('$baseUrl/patients'), headers: _headers)
+        .timeout(const Duration(seconds: 45));
+    _guard(res.statusCode);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return body['data'] as List? ?? [];
   }
 
   static Future<bool> savePatient(Map<String, dynamic> patient) async {
@@ -170,7 +173,7 @@ class ApiService {
   static Future<List<dynamic>> getReports() async {
     final res = await http
         .get(Uri.parse('$baseUrl/reports'), headers: _headers)
-        .timeout(const Duration(seconds: 15));
+        .timeout(const Duration(seconds: 45));
     _guard(res.statusCode);
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     return body['data'] as List? ?? [];
@@ -249,16 +252,22 @@ class ApiService {
     String? date,
     String? month,
     String? year,
+    String? worker,
+    String? district,
+    String? block,
   }) async {
     final params = <String, String>{};
-    if (band  != null) params['band']  = band;
-    if (date  != null) params['date']  = date;
-    if (month != null) params['month'] = month;
-    if (year  != null) params['year']  = year;
+    if (band     != null) params['band']     = band;
+    if (date     != null) params['date']     = date;
+    if (month    != null) params['month']    = month;
+    if (year     != null) params['year']     = year;
+    if (worker   != null) params['worker']   = worker;
+    if (district != null) params['district'] = district;
+    if (block    != null) params['block']    = block;
     final uri = Uri.parse('$baseUrl/admin/reports')
         .replace(queryParameters: params.isEmpty ? null : params);
     final res = await http.get(uri, headers: _headers)
-        .timeout(const Duration(seconds: 15));
+        .timeout(const Duration(seconds: 45));
     _guard(res.statusCode);
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
@@ -267,7 +276,18 @@ class ApiService {
     final res = await http.get(
       Uri.parse('$baseUrl/admin/stats'),
       headers: _headers,
-    ).timeout(const Duration(seconds: 15));
+    ).timeout(const Duration(seconds: 45));
+    _guard(res.statusCode);
+    return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  /// Returns { districts: [...], blocks: [...] } — used to populate the
+  /// admin reports filter dropdowns.
+  static Future<Map<String, dynamic>> getAdminLocations() async {
+    final res = await http.get(
+      Uri.parse('$baseUrl/admin/locations'),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 30));
     _guard(res.statusCode);
     return jsonDecode(res.body) as Map<String, dynamic>;
   }

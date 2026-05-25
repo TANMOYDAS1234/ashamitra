@@ -27,26 +27,31 @@ class PatientController extends GetxController {
   void reloadFromStorage() => _load();
 
   /// Primary data load from Atlas. Falls back to local if offline.
+  ///
+  /// Retries each call up to 2 times on transient failure (Render free-tier
+  /// cold-start can take 30+ seconds on first request after sleep). An empty
+  /// server response is treated as a valid empty state, NOT a sync failure —
+  /// so deleted records on the server correctly disappear locally.
   Future<void> syncFromServer() async {
     isLoading.value = true;
     try {
-      // Sync patients
-      final remotePatients = await ApiService.getPatients();
-      if (remotePatients.isNotEmpty) {
-        final list = remotePatients
-            .map((e) => PatientModel.fromJson(e as Map<String, dynamic>))
-            .toList();
-        patients.value = list;
-        await LocalStorageService.savePatients(list.map((p) => p.toJson()).toList());
-      }
-      // Reports — push any report that never reached the server, THEN pull the
+      // ── Patients ─────────────────────────────────────────────────────────
+      final remotePatients = await _withRetry(() => ApiService.getPatients());
+      final list = remotePatients
+          .map((e) => PatientModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+      patients.value = list;
+      await LocalStorageService.savePatients(list.map((p) => p.toJson()).toList());
+
+      // ── Reports ──────────────────────────────────────────────────────────
+      // Push any report that never reached the server, THEN pull the
       // authoritative server list. A report whose upload failed (offline /
-      // server cold-start / error) would otherwise stay local-only forever and
-      // be invisible to the admin panel, which reads only from the server.
+      // server cold-start / error) would otherwise stay local-only forever
+      // and be invisible to the admin panel, which reads only from the server.
       for (final r in reports.where(_isPendingReport).toList()) {
         await _uploadReport(r);
       }
-      final remote = await ApiService.getReports();
+      final remote = await _withRetry(() => ApiService.getReports());
       final remoteReports = remote
           .map((e) => _sanitizeReport(_remoteToLocal(e as Map<String, dynamic>)))
           .toList();
@@ -61,12 +66,32 @@ class PatientController extends GetxController {
       reports.value = merged;
       LocalStorageService.saveReports(merged);
     } on UnauthorizedException {
-      // Token invalid
-    } catch (_) {
-      // Offline — local data already loaded
+      // Token invalid — handled by AuthController via _handleUnauth elsewhere
+    } catch (e) {
+      // Offline / Render cold-start exhausted — keep local data, log for debug
+      // ignore: avoid_print
+      print('[Sync] failed after retries: $e');
     } finally {
       isLoading.value = false;
     }
+  }
+
+  /// Retries an async call up to 2 times with backoff. Re-throws after
+  /// exhausting attempts so the caller can distinguish a real failure from
+  /// an empty result. UnauthorizedException is never retried (token is bad).
+  static Future<T> _withRetry<T>(Future<T> Function() fn) async {
+    Object? lastErr;
+    for (int attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await fn();
+      } on UnauthorizedException {
+        rethrow;
+      } catch (e) {
+        lastErr = e;
+        if (attempt == 0) await Future.delayed(const Duration(seconds: 3));
+      }
+    }
+    throw lastErr ?? Exception('Retry exhausted');
   }
 
   /// Map MongoDB report fields → local report map shape.
@@ -186,7 +211,7 @@ class PatientController extends GetxController {
     _save();
     // Sync to backend — exclude local id field
     final data = patient.toJson()..remove('id');
-    ApiService.savePatient(data).catchError((_) {});
+    ApiService.savePatient(data).catchError((_) => false);
     return patient;
   }
 
@@ -282,7 +307,7 @@ class PatientController extends GetxController {
     _save();
     // Sync to backend — exclude local id field
     final data = patient.toJson()..remove('id');
-    ApiService.savePatient(data).catchError((_) {});
+    ApiService.savePatient(data).catchError((_) => false);
   }
 
   /// Attaches a fresh triage result to an existing patient (a follow-up
@@ -331,11 +356,16 @@ class PatientController extends GetxController {
     _save();
   }
 
+  /// Maps a triage outcome to a risk band. A patient with no triage yet
+  /// (manually added, no checkup) defaults to `safe` — not `moderate`. Moderate
+  /// is reserved for cases the engine actually classified between safe and high.
   RiskLevel _riskFromOutcome(String? outcome) => switch (outcome) {
     'emergency' => RiskLevel.emergency,
     'attention' => RiskLevel.high,
     'safe'      => RiskLevel.safe,
-    _           => RiskLevel.moderate,
+    null        => RiskLevel.safe,
+    ''          => RiskLevel.safe,
+    _           => RiskLevel.safe,
   };
 
   String _caseLabel(String caseType) => switch (caseType) {
