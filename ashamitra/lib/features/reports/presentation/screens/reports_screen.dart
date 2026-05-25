@@ -171,6 +171,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     // report row would propagate as an unhandled exception, crashing the
     // app in release builds (where R8 strips most error UI). Now the worst
     // case is a red snackbar with the actual error message.
+    var dialogShown = false;
     try {
       // Empty-list guard. PDF generation on zero reports would technically
       // succeed (an empty document), but the percentage math hits 0/0 and
@@ -189,6 +190,34 @@ class _ReportsScreenState extends State<ReportsScreen> {
         );
         return;
       }
+
+      // Non-dismissible progress dialog so the user has visible feedback
+      // during the (possibly multi-second) PDF generation. Without this the
+      // app appeared frozen and Android's input dispatcher would kill it as
+      // ANR after 5 seconds of UI-thread blocking. The finally below ALWAYS
+      // dismisses, even on exception, so the worker is never stuck.
+      Get.dialog<void>(
+        const PopScope(
+          canPop: false,
+          child: Center(
+            child: Card(
+              child: Padding(
+                padding: EdgeInsets.all(20),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: AppColors.primary),
+                    SizedBox(width: 16),
+                    Text('PDF তৈরি হচ্ছে...'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        barrierDismissible: false,
+      );
+      dialogShown = true;
 
       final theme = await PdfHelper.bengaliTheme();
       final doc = pw.Document(theme: theme);
@@ -347,16 +376,32 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
 
     // ── Pages 2+: Per-session detail ──────────────────────────────────────
-    doc.addPage(
+    // Why we batch (and why each batch is its own addPage call):
+    //   The pdf package runs MultiPage layout SYNCHRONOUSLY inside addPage.
+    //   With ~30+ reports, layout takes >5 seconds on the UI thread →
+    //   Android's input dispatcher kills the app with ANR. Splitting into
+    //   small batches with `await Future.delayed(Duration.zero)` between
+    //   them lets the UI thread service touch events / repaint the loading
+    //   spinner, so the OS never declares the app unresponsive.
+    //
+    //   batchSize = 6 keeps each addPage call under ~1.5 seconds even for
+    //   heavy reports with full Q&A history + multiple danger signs.
+    const batchSize = 6;
+    final totalRecords = reports.length;
+    for (int batchStart = 0; batchStart < reports.length; batchStart += batchSize) {
+      // Yield to the event loop — this is the key step that prevents ANR.
+      await Future.delayed(Duration.zero);
+      final batchEnd = (batchStart + batchSize).clamp(0, reports.length);
+      final batchReports = reports.sublist(batchStart, batchEnd);
+      final isFirstBatch = batchStart == 0;
+      final batchOffset = batchStart; // for absolute report numbering
+
+      doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.fromLTRB(36, 36, 36, 36),
-        // Default in the `pdf` package is 20 — easily exceeded once an ASHA
-        // accumulates a few dozen triage sessions, each with Q&A history,
-        // danger signs, suspected conditions, and triggered rules. Bumping
-        // to 500 covers years of pilot-scale usage without ever tripping.
-        // Memory cost is linear in actual pages used, not the cap, so this
-        // is free unless the worker really has 500+ pages of reports.
+        // 500-page safety cap per MultiPage. With our batchSize of 6
+        // reports per call (avg 1-2 pages each), we'll never approach this.
         maxPages: 500,
         header: (ctx) => pw.Container(
           padding: const pw.EdgeInsets.only(bottom: 8),
@@ -392,9 +437,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
         ),
         build: (ctx) => [
-          _sectionHeading('SESSION DETAILS  (${reports.length} records)'),
-          ...reports.asMap().entries.map((entry) {
-            final idx = entry.key + 1;
+          if (isFirstBatch)
+            _sectionHeading('SESSION DETAILS  ($totalRecords records)'),
+          ...batchReports.asMap().entries.map((entry) {
+            final idx = entry.key + batchOffset + 1;
             final r = entry.value;
             final outcome = r['outcome']?.toString() ?? 'safe';
             final bandColor = _pdfBandColor(outcome);
@@ -675,7 +721,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
         ],
       ),
     );
+    } // ── end of for-loop over batches ─────────────────────────────────────
 
+      // Yield once more before save so the UI thread can repaint the spinner.
+      await Future.delayed(Duration.zero);
       await PdfHelper.saveAndOpen(
           doc,
           'asha_mitra_report_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}.pdf');
@@ -696,6 +745,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
         borderRadius: 12,
         duration: const Duration(seconds: 6),
       );
+    } finally {
+      // ALWAYS dismiss the progress dialog, success or failure. Without this
+      // an exception would leave the worker stuck staring at a spinner.
+      if (dialogShown && (Get.isDialogOpen ?? false)) {
+        Get.back();
+      }
     }
   }
 
