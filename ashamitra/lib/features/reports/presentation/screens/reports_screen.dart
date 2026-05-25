@@ -351,6 +351,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.fromLTRB(36, 36, 36, 36),
+        // Default in the `pdf` package is 20 — easily exceeded once an ASHA
+        // accumulates a few dozen triage sessions, each with Q&A history,
+        // danger signs, suspected conditions, and triggered rules. Bumping
+        // to 500 covers years of pilot-scale usage without ever tripping.
+        // Memory cost is linear in actual pages used, not the cap, so this
+        // is free unless the worker really has 500+ pages of reports.
+        maxPages: 500,
         header: (ctx) => pw.Container(
           padding: const pw.EdgeInsets.only(bottom: 8),
           decoration: const pw.BoxDecoration(
