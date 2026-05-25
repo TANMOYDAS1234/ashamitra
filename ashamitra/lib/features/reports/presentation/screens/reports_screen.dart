@@ -166,14 +166,38 @@ class _ReportsScreenState extends State<ReportsScreen> {
       );
 
   Future<void> _downloadPdf(List<Map<String, dynamic>> reports) async {
-    final theme = await PdfHelper.bengaliTheme();
-    final doc = pw.Document(theme: theme);
-    final now = DateTime.now();
-    final generatedAt =
-        '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}  '
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    // Defense-in-depth: catch ANY exception thrown during font load, page
+    // assembly, or save. Previously a font-network failure or a malformed
+    // report row would propagate as an unhandled exception, crashing the
+    // app in release builds (where R8 strips most error UI). Now the worst
+    // case is a red snackbar with the actual error message.
+    try {
+      // Empty-list guard. PDF generation on zero reports would technically
+      // succeed (an empty document), but the percentage math hits 0/0 and
+      // some report-row code paths assume at least one entry. Easier to
+      // tell the user "nothing to export" than to render a blank file.
+      if (reports.isEmpty) {
+        Get.snackbar(
+          'No reports to export',
+          'Complete at least one triage session first.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: AppColors.warningYellow,
+          colorText: Colors.white,
+          margin: const EdgeInsets.all(16),
+          borderRadius: 12,
+          duration: const Duration(seconds: 3),
+        );
+        return;
+      }
 
-    final total = reports.length;
+      final theme = await PdfHelper.bengaliTheme();
+      final doc = pw.Document(theme: theme);
+      final now = DateTime.now();
+      final generatedAt =
+          '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}  '
+          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+
+      final total = reports.length;
     final emergency = reports.where((r) => r['outcome'] == 'emergency').length;
     final attention = reports.where((r) => r['outcome'] == 'attention').length;
     final safe = reports.where((r) => r['outcome'] == 'safe').length;
@@ -645,9 +669,27 @@ class _ReportsScreenState extends State<ReportsScreen> {
       ),
     );
 
-    await PdfHelper.saveAndOpen(
-        doc,
-        'asha_mitra_report_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}.pdf');
+      await PdfHelper.saveAndOpen(
+          doc,
+          'asha_mitra_report_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}.pdf');
+    } catch (e, st) {
+      // Never let a PDF-build failure crash the app. Show the user the real
+      // error (truncated) so they can report it; full stack stays in logcat.
+      // ignore: avoid_print
+      print('[PDF] build failed: $e\n$st');
+      Get.snackbar(
+        'PDF generation failed',
+        e.toString().length > 200
+            ? '${e.toString().substring(0, 200)}...'
+            : e.toString(),
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.emergencyRed,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
+        duration: const Duration(seconds: 6),
+      );
+    }
   }
 
   @override

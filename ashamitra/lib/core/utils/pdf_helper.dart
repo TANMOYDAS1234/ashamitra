@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show ByteData;
+import 'package:flutter/services.dart' show ByteData, rootBundle;
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:open_file/open_file.dart';
@@ -55,28 +55,48 @@ class PdfHelper {
     return _cachedRegular ??= await _loadFont(bold: false);
   }
 
-  // ── Internal: load TTF (cache → disk → network) ────────────────────────────
+  // ── Internal: load TTF — bundled asset → disk cache → network ──────────────
+  // Order changed: bundled asset comes FIRST so a fresh install with no
+  // internet still produces Bengali PDFs without crashing. The disk cache
+  // and network fallback remain for older builds that didn't ship the
+  // bundled fonts (legacy compatibility).
   static Future<pw.Font> _loadFont({required bool bold}) async {
     final fileName = bold ? 'HindSiliguri-Bold.ttf' : 'HindSiliguri-Regular.ttf';
+
+    // 1. Bundled asset (always present in this build — zero-internet safe).
+    try {
+      final data = await rootBundle.load('assets/fonts/$fileName');
+      return pw.Font.ttf(data);
+    } catch (_) {
+      // Asset missing or unreadable — fall through to disk/network.
+    }
+
     final dir = await getApplicationSupportDirectory();
     final file = File('${dir.path}/$fileName');
 
-    // 1. Disk cache (works fully offline after first download)
+    // 2. Disk cache (from a prior network fetch by an older build).
     if (file.existsSync()) {
       final bytes = await file.readAsBytes();
       return pw.Font.ttf(ByteData.sublistView(bytes));
     }
 
-    // 2. Network fetch (first PDF generation only — needs internet once)
-    final url = bold ? _boldUrl : _regularUrl;
-    final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 30));
-    if (res.statusCode != 200 || res.bodyBytes.isEmpty) {
-      throw Exception('Could not fetch Bengali PDF font ($url) — '
-          'will fall back to a Latin-only font and Bengali will render as boxes. '
-          'Try again with internet.');
+    // 3. Network fetch (last resort).
+    try {
+      final url = bold ? _boldUrl : _regularUrl;
+      final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 30));
+      if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
+        await file.writeAsBytes(res.bodyBytes, flush: true);
+        return pw.Font.ttf(ByteData.sublistView(res.bodyBytes));
+      }
+    } catch (_) {
+      // Fall through to Helvetica fallback.
     }
-    await file.writeAsBytes(res.bodyBytes, flush: true);
-    return pw.Font.ttf(ByteData.sublistView(res.bodyBytes));
+
+    // 4. Final fallback — Helvetica. Bengali glyphs will render as boxes,
+    // but the PDF will at least generate without crashing the app. The
+    // caller (reports_screen) can show a "limited PDF" snackbar if the
+    // font load failed, but never an unhandled exception.
+    return pw.Font.helvetica();
   }
 
   // ── Save + open ────────────────────────────────────────────────────────────
