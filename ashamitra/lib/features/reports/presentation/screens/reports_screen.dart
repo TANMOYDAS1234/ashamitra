@@ -590,7 +590,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                   pw.Radius.circular(4)),
                             ),
                             child: pw.Text(
-                              r['situation'].toString(),
+                              () {
+                                final s = r['situation'].toString();
+                                return s.length > 800
+                                    ? '${s.substring(0, 800)}...'
+                                    : s;
+                              }(),
                               style: const pw.TextStyle(
                                   fontSize: 10,
                                   color: PdfColors.grey800),
@@ -724,10 +729,27 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           ),
                         ],
 
-                        // Q&A history
+                        // Q&A history — capped + truncated to prevent the
+                        // pdf package's TableHelper from producing an
+                        // unbreakable widget that infinite-loops MultiPage
+                        // pagination (TooManyPagesException at 500-page cap).
+                        //
+                        // The package can't split a single tall cell across
+                        // pages, so very long answers force the whole table
+                        // onto a "ghost" oversized page that never fits,
+                        // and MultiPage retries forever until maxPages.
+                        //
+                        // Bounds applied:
+                        //   - first 8 Q&A entries only (rest gets a count note)
+                        //   - each question/answer truncated to 300 chars
+                        //   (~3 lines of cell content), so no single row is
+                        //   ever taller than a quarter page.
                         if (qaHistory.isNotEmpty) ...[
                           pw.SizedBox(height: 8),
-                          pw.Text('Conversation Q&A',
+                          pw.Text(
+                              qaHistory.length > 8
+                                  ? 'Conversation Q&A  (first 8 of ${qaHistory.length})'
+                                  : 'Conversation Q&A',
                               style: pw.TextStyle(
                                   fontSize: 10,
                                   fontWeight: pw.FontWeight.bold,
@@ -735,11 +757,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           pw.SizedBox(height: 4),
                           pw.TableHelper.fromTextArray(
                             headers: ['Question', 'Answer'],
-                            data: qaHistory.map((qa) {
+                            data: qaHistory.take(8).map((qa) {
                               final m = qa is Map ? qa : {};
+                              String trim(String s) => s.length > 300
+                                  ? '${s.substring(0, 300)}...'
+                                  : s;
                               return [
-                                m['question']?.toString() ?? '',
-                                m['answer']?.toString() ?? '',
+                                trim(m['question']?.toString() ?? ''),
+                                trim(m['answer']?.toString() ?? ''),
                               ];
                             }).toList(),
                             headerStyle: pw.TextStyle(
