@@ -53,6 +53,16 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
       _mobileCtrl.text  = args.mobile;
       _caseType = args.type;
       _gender   = args.gender.isNotEmpty ? args.gender : 'Female';
+    } else if (args is Map<String, dynamic>) {
+      // 1b fix: when the worker reaches Add Patient from a case tile on the
+      // dashboard, the case ID is passed in as 'caseType'. Pre-select that
+      // chip so they don't have to manually pick the case again — they
+      // already told us which case they're filing a patient for.
+      final preselected = args['caseType']?.toString();
+      if (preselected != null && preselected.isNotEmpty &&
+          ['Pregnancy', 'Newborn', 'Child', 'Other'].contains(preselected)) {
+        _caseType = preselected;
+      }
     }
   }
 

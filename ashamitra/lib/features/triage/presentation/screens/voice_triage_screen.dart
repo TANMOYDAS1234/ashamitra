@@ -158,9 +158,31 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
     super.dispose();
   }
 
+  /// Cache the last connectivity check for 30 seconds so a transient flap
+  /// (common on weak rural signals) doesn't bounce the worker between
+  /// 'online' and 'offline' modes every time they say a word.
+  ///
+  /// Without this cache, a brief Wi-Fi drop while the worker says "না" was
+  /// being interpreted as 'permanently offline now', and the UI would flip
+  /// to অফলাইন মোড mid-conversation. Pilot tester reported this as
+  /// "saying no goes to offline mode" because the timing made it look
+  /// causal even though the real trigger was the network flap.
+  bool? _cachedOnline;
+  DateTime? _cachedOnlineAt;
+  static const _onlineCacheDuration = Duration(seconds: 30);
+
   Future<bool> _hasInternet() async {
+    final now = DateTime.now();
+    if (_cachedOnline != null &&
+        _cachedOnlineAt != null &&
+        now.difference(_cachedOnlineAt!) < _onlineCacheDuration) {
+      return _cachedOnline!;
+    }
     final r = await Connectivity().checkConnectivity();
-    return r.any((c) => c != ConnectivityResult.none);
+    final online = r.any((c) => c != ConnectivityResult.none);
+    _cachedOnline = online;
+    _cachedOnlineAt = now;
+    return online;
   }
 
   // ── Toggle mic ────────────────────────────────────────────────

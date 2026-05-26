@@ -49,7 +49,13 @@ class _SelectCaseScreenState extends State<SelectCaseScreen> {
     await _stt.initialize();
     await _tts.init();
     await Future.delayed(const Duration(milliseconds: 600));
-    if (mounted) _tts.speak('পরিস্থিতি বলুন। মাইক বোতাম চাপুন।');
+    // Use the SAME tone as voice_triage_screen's opening prompt (empathy)
+    // so the worker doesn't hear two different speaking rates between
+    // adjacent screens — that 8% rate difference makes Kore sound like
+    // two different female voices to a non-technical ear, even though
+    // it's the exact same voice model.
+    if (mounted) _tts.speak('পরিস্থিতি বলুন। মাইক বোতাম চাপুন।',
+        tone: TtsTone.empathy);
   }
 
   Future<void> _loadCases() async {

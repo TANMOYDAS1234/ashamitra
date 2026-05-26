@@ -65,12 +65,20 @@ class PatientContextSheet extends StatelessWidget {
   void _pickExistingPatient(BuildContext context) {
     final ctrl = Get.find<PatientController>();
     Get.back(); // close this sheet first
+    // 1a fix: only show patients whose case type matches the case the worker
+    // just tapped. Worker tapping "নবজাতক (newborn)" should see only newborn
+    // patients, not the whole list. _matchesCase is forgiving — both English
+    // (Pregnancy, Newborn) and Bengali (নবজাতক, শিশু) type strings match.
+    final filtered = ctrl.patients
+        .where((p) => _matchesCase(p, caseId))
+        .toList();
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _ExistingPatientPicker(
-        patients: ctrl.patients,
+        patients: filtered,
+        caseTitle: caseTitle,
         onPick: (p) {
           Get.back();
           Get.toNamed(AppRoutes.voiceTriage, arguments: {
@@ -84,11 +92,55 @@ class PatientContextSheet extends StatelessWidget {
     );
   }
 
+  /// Matches a patient's type string against the case ID the worker tapped.
+  /// Both English ("Pregnancy", "Newborn") and Bengali ("নবজাতক", "গর্ভবতী")
+  /// type values are accepted because patients added via the form get
+  /// English types while triage-created patients get Bengali case labels.
+  static bool _matchesCase(PatientModel p, String caseId) {
+    final t = p.type.toLowerCase();
+    switch (caseId) {
+      case 'pregnancy':
+        return t.contains('pregnan') || p.type.contains('গর্ভ');
+      case 'postpartum':
+        return t.contains('postpartum') || p.type.contains('প্রসব');
+      case 'newborn':
+        return t.contains('newborn') || p.type.contains('নবজাত');
+      case 'infant':
+      case 'child':
+        return t.contains('infant') || t.contains('child') ||
+            p.type.contains('শিশু');
+      default:
+        return true; // unknown case → show all (fail-open)
+    }
+  }
+
   void _addNewPatient() {
     Get.back();
-    Get.toNamed(AppRoutes.addPatient);
+    // 1b fix: pass the case the worker tapped so Add Patient pre-selects
+    // it. add_patient_screen reads the 'caseType' key from arguments and
+    // initializes its case-type chip selection accordingly.
+    Get.toNamed(AppRoutes.addPatient, arguments: {
+      'caseType': _caseTypeForCaseId(caseId),
+    });
     // After adding, the user can launch checkup via "Save & Start Checkup",
     // which already passes patientId/Name forward.
+  }
+
+  /// Maps a dashboard caseId to the form's expected case-type label.
+  /// add_patient_screen's case chips are ['Pregnancy', 'Newborn', 'Child', 'Other'].
+  static String _caseTypeForCaseId(String caseId) {
+    switch (caseId) {
+      case 'pregnancy':
+      case 'postpartum':
+        return 'Pregnancy';
+      case 'newborn':
+        return 'Newborn';
+      case 'infant':
+      case 'child':
+        return 'Child';
+      default:
+        return 'Other';
+    }
   }
 
   @override
@@ -260,8 +312,15 @@ class _ContextOption extends StatelessWidget {
 /// "চলমান রোগী নির্বাচন করুন" in the context sheet.
 class _ExistingPatientPicker extends StatefulWidget {
   final List<PatientModel> patients;
+  /// Case title for the header — e.g. 'নবজাতক (০–২৮ দিন)' — so the worker
+  /// sees the picker is scoped to this case, not "all patients".
+  final String caseTitle;
   final void Function(PatientModel) onPick;
-  const _ExistingPatientPicker({required this.patients, required this.onPick});
+  const _ExistingPatientPicker({
+    required this.patients,
+    required this.caseTitle,
+    required this.onPick,
+  });
 
   @override
   State<_ExistingPatientPicker> createState() => _ExistingPatientPickerState();
@@ -306,7 +365,17 @@ class _ExistingPatientPickerState extends State<_ExistingPatientPicker> {
             ),
             Align(
               alignment: Alignment.centerLeft,
-              child: Text('চলমান রোগী নির্বাচন করুন', style: AppTextStyles.h2),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('চলমান রোগী নির্বাচন করুন', style: AppTextStyles.h2),
+                  const SizedBox(height: 2),
+                  Text(
+                    widget.caseTitle,
+                    style: AppTextStyles.bodySm.copyWith(color: AppColors.primary),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
