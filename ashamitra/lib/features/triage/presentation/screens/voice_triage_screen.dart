@@ -795,6 +795,23 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
                                 ),
                               ),
                               const SizedBox(width: 6),
+                              // Audio-offline indicator: shows a small mute icon
+                              // when the last TTS call could not play (no cache,
+                              // no bundled asset, no network). The on-screen
+                              // text below is still rendered so the worker
+                              // doesn't miss the question — this just tells
+                              // them why Kore went silent. Disappears the
+                              // moment any later phrase plays successfully.
+                              Obx(() => _tts.audioReady.value
+                                  ? const SizedBox.shrink()
+                                  : const Padding(
+                                      padding: EdgeInsets.only(right: 6),
+                                      child: Icon(
+                                        Icons.volume_off_rounded,
+                                        size: 14,
+                                        color: AppColors.warningYellow,
+                                      ),
+                                    )),
                               Text(
                                 _isOffline ? 'অফলাইন মোড' : 'আশামিত্র AI',
                                 style: AppTextStyles.caption.copyWith(

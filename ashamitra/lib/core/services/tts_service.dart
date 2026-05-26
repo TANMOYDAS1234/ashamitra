@@ -1,3 +1,4 @@
+import 'package:get/get.dart';
 import 'vapi_tts_service.dart';
 
 /// TTS tone profiles — each maps to a different emotional register.
@@ -42,6 +43,15 @@ class TtsService {
   Function()? onComplete;
   Function()? onError;
 
+  /// `true` when the last [speak] attempt produced audio (cache / bundle /
+  /// network all worked). `false` when audio could not be played at all
+  /// (offline + uncached + not bundled).
+  ///
+  /// Screens can listen with `Obx(() => Icon(_tts.audioReady.value ? ... ))`
+  /// to show a small "audio offline" indicator next to the rendered text so
+  /// the worker isn't surprised by silence when they expected to hear Kore.
+  final RxBool audioReady = true.obs;
+
   /// Wires the VapiTtsService callbacks. Safe to call multiple times; only
   /// the first call performs the wiring, subsequent calls re-attach the
   /// handlers (useful when the parent widget rebuilds).
@@ -51,30 +61,38 @@ class TtsService {
     _vapiTts.onError    = () => onError?.call();
   }
 
-  /// Speaks [text] in the given [tone]. See class docstring for the
-  /// playback source priority. Returns when playback starts (or silently
-  /// when no source could provide audio).
-  Future<void> speak(String text, {TtsTone tone = TtsTone.normal}) async {
-    if (text.trim().isEmpty) return;
-    await _vapiTts.speak(text, tone: tone.name);
+  /// Speaks [text] in the given [tone]. Returns `true` if audio actually
+  /// played (cache hit, bundled asset, or successful network fetch), `false`
+  /// if all three sources failed (offline + uncached + not bundled).
+  ///
+  /// Callers can use the return value to show a small "audio offline" icon
+  /// next to the rendered text so the worker isn't surprised by silence.
+  Future<bool> speak(String text, {TtsTone tone = TtsTone.normal}) async {
+    if (text.trim().isEmpty) return false;
+    final played = await _vapiTts.speak(text, tone: tone.name);
+    audioReady.value = played;
+    return played;
   }
 
   /// Convenience: speak with tone auto-derived from a clinical risk level.
-  Future<void> speakWithRisk(String text, String riskLevel) =>
+  Future<bool> speakWithRisk(String text, String riskLevel) =>
       speak(text, tone: _toneFromRisk(riskLevel));
 
   /// Emergency callout — same Kore voice, just the 'emergency' tone profile
   /// (faster speaking rate). 5-second timeout so a network hang doesn't
-  /// keep a worker waiting at the most stressful moment.
-  Future<void> speakEmergency(String text) async {
-    if (text.trim().isEmpty) return;
-    await _vapiTts.speak(text, tone: TtsTone.emergency.name)
+  /// keep a worker waiting at the most stressful moment. Returns whether
+  /// audio actually played.
+  Future<bool> speakEmergency(String text) async {
+    if (text.trim().isEmpty) return false;
+    final played = await _vapiTts.speak(text, tone: TtsTone.emergency.name)
         .timeout(const Duration(seconds: 5), onTimeout: () => false);
+    audioReady.value = played;
+    return played;
   }
 
-  Future<void> speakQuestion(String text) => speak(text, tone: TtsTone.question);
-  Future<void> speakPositive(String text) => speak(text, tone: TtsTone.positive);
-  Future<void> speakEmpathy(String text)  => speak(text, tone: TtsTone.empathy);
+  Future<bool> speakQuestion(String text) => speak(text, tone: TtsTone.question);
+  Future<bool> speakPositive(String text) => speak(text, tone: TtsTone.positive);
+  Future<bool> speakEmpathy(String text)  => speak(text, tone: TtsTone.empathy);
 
   static TtsTone _toneFromRisk(String risk) => switch (risk.toLowerCase()) {
         'emergency' => TtsTone.emergency,
