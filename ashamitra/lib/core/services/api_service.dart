@@ -220,6 +220,37 @@ class ApiService {
     }
   }
 
+  /// PATCH /reports/:id/attach-patient — links an existing (typically
+  /// anonymous) report to a patient. Used by the worker's Reports tab so
+  /// a quick urgent-triage can be retrospectively tied to the patient
+  /// once they're identified or registered.
+  /// Returns the updated server doc on success, null on failure.
+  static Future<Map<String, dynamic>?> attachPatientToReport({
+    required String reportId,
+    String? patientId,
+    String? patientName,
+    String? patientType,
+  }) async {
+    try {
+      final res = await http.patch(
+        Uri.parse('$baseUrl/reports/$reportId/attach-patient'),
+        headers: _headers,
+        body: jsonEncode({
+          if (patientId   != null) 'patientId':   patientId,
+          if (patientName != null) 'patientName': patientName,
+          if (patientType != null) 'patientType': patientType,
+        }),
+      ).timeout(const Duration(seconds: 30));
+      _guard(res.statusCode);
+      if (res.statusCode != 200) return null;
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      if (body['success'] != true) return null;
+      return body['data'] as Map<String, dynamic>?;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// PATCH /reports/repoint — updates all reports whose patientId matches
   /// [oldPatientId] to use [newPatientId] instead. Called by the patient
   /// controller immediately after a local placeholder id is swapped for a

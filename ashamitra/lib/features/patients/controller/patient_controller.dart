@@ -471,6 +471,49 @@ class PatientController extends GetxController {
     }
   }
 
+  /// Attaches an existing (typically anonymous) report to a patient. Used
+  /// by the Reports tab's 'Attach Patient' action — a worker can run an
+  /// urgent anonymous triage, save it, then later identify the patient
+  /// and link the report retroactively.
+  ///
+  /// Updates both the local cache (so the report row instantly shows the
+  /// patient name in the UI) and the server-side report doc (so admin
+  /// views and per-patient history also pick up the link).
+  ///
+  /// Returns true on confirmed server update. On network failure the
+  /// local change still persists — the report stays linked locally and
+  /// the next sync will probably re-pull the server's old (unlinked)
+  /// state. So failure-mode is: server stays out of sync until a future
+  /// retry mechanism is added. Documented honestly here.
+  Future<bool> attachPatientToReport({
+    required String reportId,
+    required String patientId,
+    required String patientName,
+    String? patientType,
+  }) async {
+    // 1. Update local cache immediately for snappy UI.
+    final idx = reports.indexWhere((r) => r['id'] == reportId);
+    if (idx != -1) {
+      reports[idx] = {
+        ...reports[idx],
+        'patientId':   patientId,
+        'patientName': patientName,
+        if (patientType != null) 'caseType': patientType,
+      };
+      reports.refresh();
+      await LocalStorageService.saveReports(reports.toList());
+    }
+
+    // 2. Patch the server doc.
+    final updated = await ApiService.attachPatientToReport(
+      reportId:    reportId,
+      patientId:   patientId,
+      patientName: patientName,
+      patientType: patientType,
+    );
+    return updated != null;
+  }
+
   /// Called from "ফলো-আপ" button — adds to patient list.
   void saveTriageResult({
     required String caseType,

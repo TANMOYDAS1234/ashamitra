@@ -1021,6 +1021,47 @@ class _ReportCardState extends State<_ReportCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
 
+                  // ── Attach-patient action (1c) — only on anonymous reports
+                  // An anonymous report is one with no linked patient (the worker
+                  // ran an urgent triage without picking/registering one first).
+                  // This action lets them tie the report to an existing patient
+                  // retroactively, so per-patient history and admin views are
+                  // complete. After attach, the row updates instantly and the
+                  // button disappears.
+                  if (r['patientName'] == null ||
+                      r['patientName']!.toString().trim().isEmpty) ...[
+                    Material(
+                      color: AppColors.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () => _openAttachPatientSheet(context, r['id']?.toString() ?? ''),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.person_add_alt_rounded,
+                                  size: 16, color: AppColors.primary),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'রোগীর সাথে যুক্ত করুন',
+                                  style: TextStyle(
+                                    fontSize: 12, fontWeight: FontWeight.w700,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                              const Icon(Icons.arrow_forward_ios_rounded,
+                                  size: 12, color: AppColors.primary),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
                   // Danger signs
                   if (dangerSigns.isNotEmpty) ...[
                     _sectionLabel('বিপদচিহ্ন', Icons.warning_amber_rounded, AppColors.emergencyRed),
@@ -1185,6 +1226,184 @@ class _ReportCardState extends State<_ReportCard> {
     ),
     child: Text(text, style: TextStyle(fontSize: 12, color: AppColors.onBackground, height: 1.5)),
   );
+
+  /// Opens a searchable bottom sheet listing the worker's existing patients.
+  /// Tapping one calls [PatientController.attachPatientToReport] which
+  /// updates the local cache + PATCHes the server-side report doc.
+  ///
+  /// Empty-state messaging covers the case where the worker hasn't
+  /// registered any patients yet — they're directed to add one first
+  /// (instead of leaving them stuck with an empty list and no exit).
+  Future<void> _openAttachPatientSheet(BuildContext context, String reportId) async {
+    final ctrl = Get.find<PatientController>();
+    final patients = ctrl.patients.toList();
+
+    if (patients.isEmpty) {
+      Get.snackbar(
+        'কোনো রোগী নেই',
+        'প্রথমে রোগী যোগ করুন, তারপর এই রিপোর্টে যুক্ত করুন।',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.warningYellow,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
+        duration: const Duration(seconds: 4),
+      );
+      return;
+    }
+
+    String query = '';
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (sbCtx, setSheetState) {
+          final q = query.toLowerCase().trim();
+          final filtered = q.isEmpty
+              ? patients
+              : patients.where((p) =>
+                  p.name.toLowerCase().contains(q) ||
+                  p.village.toLowerCase().contains(q) ||
+                  p.mobile.contains(q),
+                ).toList();
+          return SafeArea(
+            child: Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(sbCtx).size.height * 0.75,
+              ),
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40, height: 4,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('রোগী নির্বাচন করুন',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    autofocus: false,
+                    onChanged: (v) => setSheetState(() => query = v),
+                    decoration: const InputDecoration(
+                      hintText: 'নাম, গ্রাম বা মোবাইল দিয়ে খুঁজুন',
+                      prefixIcon: Icon(Icons.search_rounded,
+                          color: AppColors.primary, size: 22),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: filtered.isEmpty
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 32),
+                              child: Text('কোনো ফলাফল পাওয়া যায়নি'),
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            itemCount: filtered.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 6),
+                            itemBuilder: (_, i) {
+                              final p = filtered[i];
+                              return Material(
+                                color: AppColors.primarySoft,
+                                borderRadius: AppRadius.lgR,
+                                child: InkWell(
+                                  borderRadius: AppRadius.lgR,
+                                  onTap: () async {
+                                    Navigator.of(sheetCtx).pop();
+                                    final ok = await ctrl.attachPatientToReport(
+                                      reportId:    reportId,
+                                      patientId:   p.id,
+                                      patientName: p.name,
+                                      patientType: p.type,
+                                    );
+                                    Get.snackbar(
+                                      ok ? 'যুক্ত হয়েছে' : 'যুক্ত হয়েছে (অফলাইন)',
+                                      ok
+                                          ? '${p.name} এই রিপোর্টের সাথে যুক্ত করা হয়েছে।'
+                                          : '${p.name} স্থানীয়ভাবে যুক্ত — সার্ভারে পরে সিঙ্ক হবে।',
+                                      snackPosition: SnackPosition.BOTTOM,
+                                      backgroundColor: ok
+                                          ? AppColors.safeGreen
+                                          : AppColors.warningYellow,
+                                      colorText: Colors.white,
+                                      margin: const EdgeInsets.all(16),
+                                      borderRadius: 12,
+                                      duration: const Duration(seconds: 3),
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Row(
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 20,
+                                          backgroundColor: AppColors.primary
+                                              .withValues(alpha: 0.12),
+                                          child: Text(
+                                            p.name.isNotEmpty
+                                                ? p.name[0].toUpperCase()
+                                                : '?',
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                                color: AppColors.primary),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(p.name,
+                                                  style: const TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.w700)),
+                                              Text(
+                                                '${p.type} · ${p.village.isEmpty ? "—" : p.village}',
+                                                style: const TextStyle(
+                                                    fontSize: 11,
+                                                    color: AppColors.textSecondary),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
 
 // ── Case breakdown bar chart ──────────────────────────────────────────────────
