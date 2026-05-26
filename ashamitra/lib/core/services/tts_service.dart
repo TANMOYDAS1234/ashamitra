@@ -1,8 +1,9 @@
-import 'package:flutter_tts/flutter_tts.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'vapi_tts_service.dart';
 
-/// TTS tone profiles — each maps to a different emotional register
+/// TTS tone profiles — each maps to a different emotional register.
+/// The backend (server.js) maps these to Google Cloud speaking-rate values
+/// when synthesizing Bengali audio through Chirp3-HD-Kore. The Flutter side
+/// just passes the tone name through to /api/tts.
 enum TtsTone {
   normal,    // routine questions — calm, clear
   empathy,   // acknowledging patient situation — warm, slightly slower
@@ -12,165 +13,77 @@ enum TtsTone {
   question,  // asking a clinical question — clear, slightly slower
 }
 
+/// Thin facade over [VapiTtsService] that exposes tone-aware speak methods.
+///
+/// One voice everywhere: Google Cloud Chirp3-HD-Kore (mature authoritative
+/// female). The previous device-TTS fallback path was removed because it
+/// used Android's system Bengali voice — also female, but clearly different
+/// from Kore. Pilot testers reported it as "two different voices" and
+/// found the inconsistency confusing.
+///
+/// Sources VapiTtsService tries in order for every speak call:
+///   1. On-disk cache (instant after first play)
+///   2. APK-bundled asset (instant for ~105 critical phrases shipped with
+///      the app — emergency callouts, common questions, ack fillers)
+///   3. Backend /api/tts → Google Cloud (~1-2 sec network round-trip)
+///
+/// If all three fail (offline + uncached + not bundled), the call returns
+/// silently — no fallback voice. The on-screen text is always rendered
+/// regardless, so workers never miss the question itself, just the audio
+/// reinforcement of it in rare offline cases.
 class TtsService {
   static final TtsService _instance = TtsService._();
   factory TtsService() => _instance;
   TtsService._();
 
-  // ── Engines ───────────────────────────────────────────────────────────────
-  final FlutterTts _deviceTts = FlutterTts();
   final VapiTtsService _vapiTts = VapiTtsService();
-
-  // Online TTS = Google Cloud Chirp3-HD Bengali via backend /api/tts.
-  // Offline fallback = on-device flutter_tts.
-  static const bool _useOnlineTts = true;
-
-  bool _initialized = false;
-  TtsTone _currentTone = TtsTone.normal;
 
   Function()? onStart;
   Function()? onComplete;
   Function()? onError;
 
-  // ── Device TTS tone profiles (offline fallback) ───────────────────────────
-  static const _profiles = <TtsTone, _ToneProfile>{
-    TtsTone.normal:    _ToneProfile(rate: 0.42, pitch: 1.0,  pauseMs: 180),
-    TtsTone.empathy:   _ToneProfile(rate: 0.38, pitch: 0.95, pauseMs: 250),
-    TtsTone.urgent:    _ToneProfile(rate: 0.48, pitch: 1.1,  pauseMs: 120),
-    TtsTone.emergency: _ToneProfile(rate: 0.55, pitch: 1.2,  pauseMs: 80),
-    TtsTone.positive:  _ToneProfile(rate: 0.40, pitch: 1.05, pauseMs: 200),
-    TtsTone.question:  _ToneProfile(rate: 0.38, pitch: 1.0,  pauseMs: 300),
-  };
-
-  // ── Init ──────────────────────────────────────────────────────────────────
+  /// Wires the VapiTtsService callbacks. Safe to call multiple times; only
+  /// the first call performs the wiring, subsequent calls re-attach the
+  /// handlers (useful when the parent widget rebuilds).
   Future<void> init() async {
-    if (_initialized) {
-      _attachDeviceHandlers();
-      return;
-    }
-    // Device TTS — always initialised as offline fallback
-    await _deviceTts.setEngine('com.google.android.tts');
-    await _deviceTts.setLanguage('bn-IN');
-    await _deviceTts.awaitSpeakCompletion(true);
-    await _applyDeviceProfile(TtsTone.normal);
-    _attachDeviceHandlers();
-
-    // VAPI TTS — wire callbacks
     _vapiTts.onStart    = () => onStart?.call();
     _vapiTts.onComplete = () => onComplete?.call();
     _vapiTts.onError    = () => onError?.call();
-
-    _initialized = true;
   }
 
-  void _attachDeviceHandlers() {
-    _deviceTts.setStartHandler(()  => onStart?.call());
-    _deviceTts.setCompletionHandler(() => onComplete?.call());
-    _deviceTts.setErrorHandler((_) => onError?.call());
-  }
-
-  Future<void> _applyDeviceProfile(TtsTone tone) async {
-    final p = _profiles[tone]!;
-    await _deviceTts.setSpeechRate(p.rate);
-    await _deviceTts.setPitch(p.pitch);
-    await _deviceTts.setVolume(1.0);
-    _currentTone = tone;
-  }
-
-  // ── Online check ──────────────────────────────────────────────────────────
-  Future<bool> _isOnline() async {
-    final r = await Connectivity().checkConnectivity();
-    return r.any((c) => c != ConnectivityResult.none);
-  }
-
-  // ── Core speak ────────────────────────────────────────────────────────────
-  /// Speaks text using ElevenLabs (human voice) when [_useOnlineTts] is on
-  /// and the device is online; otherwise uses on-device flutter_tts.
+  /// Speaks [text] in the given [tone]. See class docstring for the
+  /// playback source priority. Returns when playback starts (or silently
+  /// when no source could provide audio).
   Future<void> speak(String text, {TtsTone tone = TtsTone.normal}) async {
     if (text.trim().isEmpty) return;
-
-    if (_useOnlineTts && await _isOnline()) {
-      final success = await _vapiTts.speak(text, tone: tone.name);
-      if (success) return;
-      // Online TTS failed (quota, cold start, network) — fall through to device TTS.
-    }
-
-    await _speakDevice(text, tone);
+    await _vapiTts.speak(text, tone: tone.name);
   }
 
-  Future<void> _speakDevice(String text, TtsTone tone) async {
-    if (tone != _currentTone) await _applyDeviceProfile(tone);
-    final profile = _profiles[tone]!;
-
-    final sentences = text
-        .split(RegExp(r'(?<=[।!?\.])\\s*'))
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
-
-    if (sentences.length <= 1) {
-      await _deviceTts.speak(text);
-      return;
-    }
-
-    for (int i = 0; i < sentences.length; i++) {
-      await _deviceTts.speak(sentences[i]);
-      if (i < sentences.length - 1) {
-        final isQuestion = sentences[i + 1].endsWith('?');
-        final delay = isQuestion ? profile.pauseMs + 120 : profile.pauseMs;
-        await Future.delayed(Duration(milliseconds: delay));
-      }
-    }
-  }
-
-  // ── Convenience methods ───────────────────────────────────────────────────
-
-  /// Speak with tone auto-detected from risk level string.
+  /// Convenience: speak with tone auto-derived from a clinical risk level.
   Future<void> speakWithRisk(String text, String riskLevel) =>
       speak(text, tone: _toneFromRisk(riskLevel));
 
-  /// Emergency alert — always urgent, never cached (time-critical).
+  /// Emergency callout — same Kore voice, just the 'emergency' tone profile
+  /// (faster speaking rate). 5-second timeout so a network hang doesn't
+  /// keep a worker waiting at the most stressful moment.
   Future<void> speakEmergency(String text) async {
-    if (_useOnlineTts && await _isOnline()) {
-      final success = await _vapiTts.speak(text, tone: TtsTone.emergency.name)
-          .timeout(const Duration(seconds: 5), onTimeout: () => false);
-      if (success) return;
-    }
-    await _speakDevice(text, TtsTone.emergency);
+    if (text.trim().isEmpty) return;
+    await _vapiTts.speak(text, tone: TtsTone.emergency.name)
+        .timeout(const Duration(seconds: 5), onTimeout: () => false);
   }
 
-  /// Clinical question — slightly slower.
   Future<void> speakQuestion(String text) => speak(text, tone: TtsTone.question);
-
-  /// Reassurance / GREEN result.
   Future<void> speakPositive(String text) => speak(text, tone: TtsTone.positive);
-
-  /// Empathy acknowledgment.
-  Future<void> speakEmpathy(String text) => speak(text, tone: TtsTone.empathy);
+  Future<void> speakEmpathy(String text)  => speak(text, tone: TtsTone.empathy);
 
   static TtsTone _toneFromRisk(String risk) => switch (risk.toLowerCase()) {
-    'emergency' => TtsTone.emergency,
-    'high'      => TtsTone.emergency,
-    'medium'    => TtsTone.urgent,
-    'low'       => TtsTone.normal,
-    'safe'      => TtsTone.positive,
-    _           => TtsTone.normal,
-  };
+        'emergency' => TtsTone.emergency,
+        'high'      => TtsTone.emergency,
+        'medium'    => TtsTone.urgent,
+        'low'       => TtsTone.normal,
+        'safe'      => TtsTone.positive,
+        _           => TtsTone.normal,
+      };
 
-  Future<void> stop() async {
-    await _deviceTts.stop();
-    await _vapiTts.stop();
-  }
-}
-
-// ── Internal tone profile model ───────────────────────────────────────────────
-class _ToneProfile {
-  final double rate;
-  final double pitch;
-  final int pauseMs;
-  const _ToneProfile({
-    required this.rate,
-    required this.pitch,
-    required this.pauseMs,
-  });
+  Future<void> stop() => _vapiTts.stop();
 }
