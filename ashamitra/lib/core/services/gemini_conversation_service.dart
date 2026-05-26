@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../constants/api_constants.dart';
 import 'ai_response_cache.dart';
+import 'api_service.dart';
 import 'vitals_extractor.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -23,6 +24,10 @@ class ConversationResponse {
   final Map<String, double> extractedVitals;
   final bool shouldFinish;
   final String riskLevel;
+  /// MP3 bytes returned by the combined /chat-with-voice endpoint (2b).
+  /// When non-null the caller can play these directly and skip the
+  /// separate /tts round-trip — saving ~200-500ms on Render.
+  final List<int>? prefetchedAudio;
 
   const ConversationResponse({
     required this.spokenResponse,
@@ -30,6 +35,7 @@ class ConversationResponse {
     this.extractedVitals = const {},
     required this.shouldFinish,
     required this.riskLevel,
+    this.prefetchedAudio,
   });
 }
 
@@ -298,40 +304,73 @@ extracted_answers শুধু সেই প্রশ্নগুলো যা �
     final cache = AiResponseCache();
     final cached = await cache.get(prompt);
     Map<String, dynamic>? bodyJson;
+    List<int>? prefetchedAudio;
     if (cached != null) {
       bodyJson = cached;
     } else {
-      // ── Call backend proxy — key lives on server ────────────────────────────
-      // Retry up to 2 times with increasing timeouts (cold-start / rural network).
-      http.Response? response;
-      const timeouts = [Duration(seconds: 20), Duration(seconds: 30)];
+      // ── Combined chat + voice (2b) ──────────────────────────────────────────
+      // One round-trip instead of two. The server pulls "spoken_response"
+      // out of the LLM's JSON output itself and synthesizes TTS, so we get
+      // text + MP3 in a single response. On failure we fall through to the
+      // legacy /api/chat path so the worker is never left silent.
+      // Retry up to 2 times for cold-start / rural network.
+      Map<String, dynamic>? combined;
+      const timeouts = [Duration(seconds: 25), Duration(seconds: 35)];
       for (int attempt = 0; attempt < timeouts.length; attempt++) {
-        try {
-          response = await http.post(
-            Uri.parse('${ApiConstants.baseUrl}/chat'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'prompt': prompt}),
-          ).timeout(timeouts[attempt]);
-          if (response.statusCode == 200) break; // success
-          if (response.statusCode != 503) break; // non-retryable error
-          // 503 = server cold-start — wait briefly then retry
-          await Future.delayed(Duration(seconds: attempt + 1));
-        } on Exception {
-          if (attempt == timeouts.length - 1) rethrow;
+        combined = await ApiService.chatWithVoice(
+          prompt: prompt,
+          voiceField: 'spoken_response',
+          tone: 'normal',
+          timeout: timeouts[attempt],
+        );
+        if (combined != null) break;
+        if (attempt < timeouts.length - 1) {
           await Future.delayed(Duration(seconds: attempt + 1));
         }
       }
 
-      if (response == null || response.statusCode != 200) {
-        // ignore: avoid_print
-        print('[Chat] HTTP ${response?.statusCode}: ${response?.body}');
-        throw Exception('Backend chat error ${response?.statusCode}');
+      if (combined != null) {
+        bodyJson = combined;
+        final audioB64 = combined['audio'] as String?;
+        if (audioB64 != null && audioB64.isNotEmpty) {
+          try {
+            prefetchedAudio = base64Decode(audioB64);
+          } catch (_) { /* fall back to /tts in caller */ }
+        }
+      } else {
+        // ── Fallback: legacy /api/chat (no prefetched audio) ──────────────────
+        http.Response? response;
+        for (int attempt = 0; attempt < timeouts.length; attempt++) {
+          try {
+            response = await http.post(
+              Uri.parse('${ApiConstants.baseUrl}/chat'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'prompt': prompt}),
+            ).timeout(timeouts[attempt]);
+            if (response.statusCode == 200) break;
+            if (response.statusCode != 503) break;
+            await Future.delayed(Duration(seconds: attempt + 1));
+          } on Exception {
+            if (attempt == timeouts.length - 1) rethrow;
+            await Future.delayed(Duration(seconds: attempt + 1));
+          }
+        }
+        if (response == null || response.statusCode != 200) {
+          // ignore: avoid_print
+          print('[Chat] HTTP ${response?.statusCode}: ${response?.body}');
+          throw Exception('Backend chat error ${response?.statusCode}');
+        }
+        bodyJson = jsonDecode(response.body) as Map<String, dynamic>;
       }
 
-      bodyJson = jsonDecode(response.body) as Map<String, dynamic>;
-      // Cache for offline reuse — non-blocking.
+      // Cache the text payload for offline reuse — but NOT the audio bytes
+      // (those are cached separately by VapiTtsService keyed on text+voice).
       if ((bodyJson['text'] as String? ?? '').isNotEmpty) {
-        unawaited(cache.put(prompt, bodyJson));
+        final cachePayload = Map<String, dynamic>.from(bodyJson)
+          ..remove('audio')
+          ..remove('audioMime')
+          ..remove('audioTone');
+        unawaited(cache.put(prompt, cachePayload));
       }
     }
     final raw = (bodyJson['text'] as String? ?? '')
@@ -366,6 +405,7 @@ extracted_answers শুধু সেই প্রশ্নগুলো যা �
         extractedVitals: spokenVitals,
         shouldFinish: false,
         riskLevel: 'low',
+        prefetchedAudio: prefetchedAudio,
       );
     }
 
@@ -387,6 +427,7 @@ extracted_answers শুধু সেই প্রশ্নগুলো যা �
       extractedVitals: spokenVitals,
       shouldFinish: json['should_finish'] == true,
       riskLevel: json['risk_level'] as String? ?? 'low',
+      prefetchedAudio: prefetchedAudio,
     );
   }
 

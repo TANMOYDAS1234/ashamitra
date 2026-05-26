@@ -277,6 +277,52 @@ class ApiService {
     }
   }
 
+  /// POST /chat-with-voice — one round-trip chat + TTS for the triage flow
+  /// (2b). Saves the second client→server hop that /api/chat + /api/tts
+  /// otherwise requires, which on Render cold-start is the difference
+  /// between text-then-voice and text-with-voice landing together.
+  ///
+  /// Returns the parsed body on success, null on any failure (caller
+  /// should fall back to the separate /chat + /tts path).
+  ///
+  /// Response fields:
+  ///   text       — raw LLM output
+  ///   provider   — groq | gemini
+  ///   cached     — true if served from server AiCache
+  ///   audio      — base64 MP3 or null (synthesis-failure is non-fatal)
+  ///   audioMime  — "audio/mpeg" when audio is present
+  ///   audioTone  — echoes the requested tone
+  ///   spokenText — the substring actually spoken (after voiceField pluck)
+  static Future<Map<String, dynamic>?> chatWithVoice({
+    required String prompt,
+    String tone = 'normal',
+    String? voiceText,
+    String? voiceField,
+    bool skipCache = false,
+    Duration timeout = const Duration(seconds: 35),
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/chat-with-voice'),
+        headers: _headers,
+        body: jsonEncode({
+          'prompt': prompt,
+          'tone': tone,
+          if (voiceText  != null) 'voiceText':  voiceText,
+          if (voiceField != null) 'voiceField': voiceField,
+          if (skipCache)          'skipCache':  true,
+        }),
+      ).timeout(timeout);
+      _guard(res.statusCode);
+      if (res.statusCode != 200) return null;
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      if (body['success'] != true) return null;
+      return body;
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<List<dynamic>> getReports() async {
     final res = await http
         .get(Uri.parse('$baseUrl/reports'), headers: _headers)

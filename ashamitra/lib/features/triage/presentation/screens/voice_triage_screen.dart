@@ -369,8 +369,24 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
         _transcript = '';
       });
 
-      // Speak the response
-      await _speakNatural(response.spokenResponse);
+      // Speak the response. If the combined /chat-with-voice endpoint
+      // pre-synthesized the MP3, play those bytes directly — no second
+      // network round-trip. Otherwise fall back to the standard cache-
+      // then-network path.
+      if (response.prefetchedAudio != null && response.prefetchedAudio!.isNotEmpty) {
+        // tone matches the server's default ('normal') for chat-with-voice;
+        // _speakNatural would have used the risk-derived tone, but the
+        // round-trip savings dominate the perceptual difference of a
+        // slightly different speaking rate. The bytes are cached under the
+        // 'normal' tone key — consistent with how the server synthesized them.
+        await _tts.speakBytes(
+          response.prefetchedAudio!,
+          text: response.spokenResponse,
+          tone: TtsTone.normal,
+        );
+      } else {
+        await _speakNatural(response.spokenResponse);
+      }
 
       if (!mounted) return;
 

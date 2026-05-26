@@ -94,6 +94,26 @@ class TtsService {
   Future<bool> speakPositive(String text) => speak(text, tone: TtsTone.positive);
   Future<bool> speakEmpathy(String text)  => speak(text, tone: TtsTone.empathy);
 
+  /// Plays [audioBytes] (an MP3 the combined /chat-with-voice endpoint
+  /// returned alongside the text) instead of issuing a fresh /tts call.
+  /// The bytes are also written to the on-device cache under the same key
+  /// as [speak] would use, so the next time the same phrase is needed it's
+  /// a pure cache hit. Returns whether audio actually played.
+  Future<bool> speakBytes(
+    List<int> audioBytes, {
+    required String text,
+    TtsTone tone = TtsTone.normal,
+  }) async {
+    if (audioBytes.isEmpty || text.trim().isEmpty) return false;
+    final played = await _vapiTts.speakBytes(
+      audioBytes,
+      text: text,
+      tone: tone.name,
+    );
+    audioReady.value = played;
+    return played;
+  }
+
   static TtsTone _toneFromRisk(String risk) => switch (risk.toLowerCase()) {
         'emergency' => TtsTone.emergency,
         'high'      => TtsTone.emergency,

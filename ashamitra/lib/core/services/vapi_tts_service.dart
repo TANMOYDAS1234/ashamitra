@@ -105,6 +105,36 @@ class VapiTtsService {
     }
   }
 
+  /// Play [audioBytes] for [text]+[tone] without hitting the network.
+  /// Used by the combined /chat-with-voice path (2b) where the server
+  /// already returned the MP3 in the same response. The bytes are also
+  /// written to the on-device cache under the same key as [speak] so
+  /// the next time the same phrase is needed it's a pure cache hit.
+  /// Returns true if playback started, false on any failure.
+  Future<bool> speakBytes(
+    List<int> audioBytes, {
+    required String text,
+    String tone = 'normal',
+  }) async {
+    if (audioBytes.isEmpty) return false;
+    final key  = _cacheKey(text, tone);
+    final dir  = await _cacheDir;
+    final file = File('${dir.path}/$key.mp3');
+    try {
+      if (!file.existsSync()) {
+        await file.writeAsBytes(audioBytes);
+        await _evictIfNeeded(dir);
+      }
+      onStart?.call();
+      _player.onPlayerComplete.listen((_) => onComplete?.call());
+      await _player.play(DeviceFileSource(file.path));
+      return true;
+    } catch (_) {
+      onError?.call();
+      return false;
+    }
+  }
+
   Future<void> stop() async => _player.stop();
 
   /// Returns true if [text]+[tone] is already in the local MP3 cache.
