@@ -463,6 +463,70 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
   }
 
+  // ── Delete-report flow ────────────────────────────────────────────────────
+  // Swipe-from-right on a report card triggers Dismissible, which calls
+  // _confirmDeleteReport (an AlertDialog). On confirm the card animates
+  // out; the optimistic delete + undo snackbar are wired in
+  // _onReportDismissed. Soft-delete on the server (deletedAt set) — admin
+  // retains the audit copy via /api/admin/reports/deleted.
+  Future<bool?> _confirmDeleteReport(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('এই রিপোর্ট মুছে ফেলবেন?'),
+        content: const Text(
+          'রিপোর্টটি আপনার তালিকা থেকে সরিয়ে নেওয়া হবে। '
+          '৫ সেকেন্ডের মধ্যে "Undo" চেপে ফিরিয়ে আনা যাবে।',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('বাতিল'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.emergencyRed),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('মুছে ফেলুন'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _onReportDismissed(
+    BuildContext context,
+    PatientController ctrl,
+    String reportId,
+  ) async {
+    // Capture before the await so we don't reach for `context` once the
+    // widget may have unmounted (lint use_build_context_synchronously).
+    final messenger = ScaffoldMessenger.of(context);
+    final snapshot = await ctrl.deleteReport(reportId);
+    if (!mounted) return;
+    if (snapshot == null) {
+      Get.snackbar(
+        'মুছে ফেলা যায়নি',
+        'নেটওয়ার্ক ত্রুটি — আবার চেষ্টা করুন',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.emergencyRed,
+        colorText: Colors.white,
+      );
+      return;
+    }
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: const Text('রিপোর্ট মুছে ফেলা হয়েছে'),
+        duration: const Duration(seconds: 5),
+        action: SnackBarAction(
+          label: 'Undo',
+          textColor: Colors.white,
+          onPressed: () => ctrl.restoreReport(snapshot),
+        ),
+      ),
+    );
+  }
+
   // ── PDF generation entry point ──────────────────────────────────────────
   // The entire PDF build runs in a background isolate via [_buildPdfBytes]
   // (top-level, above this class). This avoids:
@@ -804,7 +868,36 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         Text('সেশন ইতিহাস', style: AppTextStyles.h3),
                         const SizedBox(height: 10),
 
-                        ...reports.map((r) => _ReportCard(
+                        ...reports.map((r) {
+                          final reportId = r['id']?.toString() ?? '';
+                          return Dismissible(
+                            key: ValueKey('report_$reportId'),
+                            direction: DismissDirection.endToStart,
+                            background: Container(
+                              margin: const EdgeInsets.symmetric(vertical: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 24),
+                              alignment: Alignment.centerRight,
+                              decoration: BoxDecoration(
+                                color: AppColors.emergencyRed,
+                                borderRadius: AppRadius.lgR,
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Icon(Icons.delete_outline_rounded,
+                                      color: Colors.white, size: 24),
+                                  SizedBox(width: 8),
+                                  Text('মুছে ফেলুন',
+                                      style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                            ),
+                            confirmDismiss: (_) => _confirmDeleteReport(context),
+                            onDismissed: (_) =>
+                                _onReportDismissed(context, ctrl, reportId),
+                            child: _ReportCard(
                               r: r,
                               outcomeColor: _outcomeColor(
                                   r['outcome']?.toString() ?? 'safe'),
@@ -813,7 +906,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                               outcomeLabel: _outcomeLabel(
                                   r['outcome']?.toString() ?? 'safe'),
                               formatDate: _formatDate,
-                            )),
+                            ),
+                          );
+                        }),
                       ],
                     ),
                     ),

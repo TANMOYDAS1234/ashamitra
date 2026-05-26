@@ -390,6 +390,17 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
 
       if (!mounted) return;
 
+      // ── No-situation exit ──────────────────────────────────────────────
+      // LLM judged this isn't a real triage (worker was just chatting /
+      // testing / has no patient). The farewell has already been spoken
+      // above; pop back to home WITHOUT writing a report.
+      if (response.cancelSession) {
+        _tts.stop();
+        _stt.stop();
+        Get.back();
+        return;
+      }
+
       // Finish if Gemini says so or max turns reached
       if (response.shouldFinish || _turnCount >= _kMaxTurns) {
         await _speakClosingSummary();

@@ -323,6 +323,52 @@ class ApiService {
     }
   }
 
+  /// DELETE /reports/:id — soft-deletes the report (sets deletedAt on the
+  /// server). The doc is preserved for admin audit; the worker just hides
+  /// it from their view. Returns true on success.
+  static Future<bool> deleteReport(String reportId) async {
+    try {
+      final res = await http.delete(
+        Uri.parse('$baseUrl/reports/$reportId'),
+        headers: _headers,
+      ).timeout(const Duration(seconds: 30));
+      _guard(res.statusCode);
+      if (res.statusCode != 200) return false;
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      return body['success'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// PATCH /reports/:id/restore — clears deletedAt. Powers the "Undo"
+  /// snackbar after a worker accidentally deletes a report.
+  static Future<bool> restoreReport(String reportId) async {
+    try {
+      final res = await http.patch(
+        Uri.parse('$baseUrl/reports/$reportId/restore'),
+        headers: _headers,
+      ).timeout(const Duration(seconds: 30));
+      _guard(res.statusCode);
+      if (res.statusCode != 200) return false;
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      return body['success'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// GET /admin/reports/deleted — admin audit view of every soft-deleted
+  /// report (worker name populated). Sorted most-recent deletion first.
+  static Future<List<dynamic>> getDeletedReports() async {
+    final res = await http
+        .get(Uri.parse('$baseUrl/admin/reports/deleted'), headers: _headers)
+        .timeout(const Duration(seconds: 45));
+    _guard(res.statusCode);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return body['data'] as List? ?? [];
+  }
+
   static Future<List<dynamic>> getReports() async {
     final res = await http
         .get(Uri.parse('$baseUrl/reports'), headers: _headers)

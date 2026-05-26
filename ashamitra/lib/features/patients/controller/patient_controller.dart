@@ -514,6 +514,56 @@ class PatientController extends GetxController {
     return updated != null;
   }
 
+  /// Soft-deletes a report. Optimistic: removes from the local list
+  /// immediately, then asks the server to set deletedAt. If the server
+  /// call fails the local copy is restored so the worker isn't lied to.
+  /// Returns the removed report map (for undo) or null on failure.
+  Future<Map<String, dynamic>?> deleteReport(String reportId) async {
+    final idx = reports.indexWhere((r) => r['id'] == reportId);
+    if (idx == -1) return null;
+    final snapshot = Map<String, dynamic>.from(reports[idx]);
+    reports.removeAt(idx);
+    reports.refresh();
+    await LocalStorageService.saveReports(reports.toList());
+
+    final ok = await ApiService.deleteReport(reportId);
+    if (!ok) {
+      // Roll back — restore at the original index so the UI matches reality.
+      reports.insert(idx.clamp(0, reports.length), snapshot);
+      reports.refresh();
+      await LocalStorageService.saveReports(reports.toList());
+      return null;
+    }
+    return snapshot;
+  }
+
+  /// Restores a soft-deleted report. Inserts it back at the top of the
+  /// list (sorted-by-recency stays consistent) and clears deletedAt on
+  /// the server. Used by the "Undo" snackbar.
+  Future<bool> restoreReport(Map<String, dynamic> snapshot) async {
+    final reportId = snapshot['id']?.toString();
+    if (reportId == null || reportId.isEmpty) return false;
+
+    // Avoid duplicate insertion if something else (e.g. a sync) already
+    // brought it back.
+    final exists = reports.any((r) => r['id'] == reportId);
+    if (!exists) {
+      reports.insert(0, snapshot);
+      reports.refresh();
+      await LocalStorageService.saveReports(reports.toList());
+    }
+
+    final ok = await ApiService.restoreReport(reportId);
+    if (!ok && !exists) {
+      // Server refused — remove the local copy we just added so we don't
+      // leave the worker with a phantom report.
+      reports.removeWhere((r) => r['id'] == reportId);
+      reports.refresh();
+      await LocalStorageService.saveReports(reports.toList());
+    }
+    return ok;
+  }
+
   /// Called from "ফলো-আপ" button — adds to patient list.
   void saveTriageResult({
     required String caseType,
