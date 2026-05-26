@@ -102,7 +102,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library_rounded, color: AppColors.primary),
-                title: const Text('Choose from Gallery'),
+                title: Text('photo_choose_gallery'.tr),
                 onTap: () {
                   Navigator.of(ctx).pop();
                   _pickImage(ImageSource.gallery);
@@ -110,7 +110,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.camera_alt_rounded, color: AppColors.primary),
-                title: const Text('Take Photo'),
+                title: Text('photo_take'.tr),
                 onTap: () {
                   Navigator.of(ctx).pop();
                   _pickImage(ImageSource.camera);
@@ -120,8 +120,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ? ListTile(
                       leading: const Icon(Icons.delete_outline_rounded,
                           color: AppColors.emergencyRed),
-                      title: const Text('Remove Photo',
-                          style: TextStyle(color: AppColors.emergencyRed)),
+                      title: Text('photo_remove'.tr,
+                          style: const TextStyle(color: AppColors.emergencyRed)),
                       onTap: () {
                         auth.updateProfileImage(null);
                         Navigator.of(ctx).pop();

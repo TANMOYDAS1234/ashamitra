@@ -157,6 +157,17 @@ class AppTranslations extends Translations {
     "admin_verify": "Verify OTP",
     "admin_language": "Change Language",
     "admin_logout": "Logout",
+    // ── Profile photo actions (both worker + admin) ─────────────
+    "photo_choose_gallery": "Choose from Gallery",
+    "photo_take": "Take Photo",
+    "photo_remove": "Remove Photo",
+    "photo_hold_to_view": "Hold to view photo",
+    "role_admin": "Admin",
+    "role_worker": "ASHA Worker",
+    "confirm_logout": "Do you want to logout?",
+    "confirm_logout_msg": "You will need to log in again to access your account.",
+    "yes": "Yes",
+    "no": "No",
   };
 
   static const _bn = {
@@ -315,6 +326,17 @@ class AppTranslations extends Translations {
     "admin_verify": "OTP যাচাই করুন",
     "admin_language": "ভাষা পরিবর্তন",
     "admin_logout": "লগআউট",
+    // ── Profile photo actions ─────────────
+    "photo_choose_gallery": "গ্যালারি থেকে বেছে নিন",
+    "photo_take": "ক্যামেরা দিয়ে তুলুন",
+    "photo_remove": "ছবি সরিয়ে দিন",
+    "photo_hold_to_view": "ছবি ধরে রাখুন দেখতে",
+    "role_admin": "অ্যাডমিন",
+    "role_worker": "ASHA কর্মী",
+    "confirm_logout": "লগআউট করতে চান?",
+    "confirm_logout_msg": "আবার লগইন করে অ্যাকাউন্টে ঢুকতে হবে।",
+    "yes": "হ্যাঁ",
+    "no": "না",
   };
 
   static const _hi = {
@@ -473,6 +495,17 @@ class AppTranslations extends Translations {
     "admin_verify": "OTP सत्यापित करें",
     "admin_language": "भाषा बदलें",
     "admin_logout": "लॉगआउट",
+    // ── Profile photo actions ─────────────
+    "photo_choose_gallery": "गैलरी से चुनें",
+    "photo_take": "कैमरे से फ़ोटो लें",
+    "photo_remove": "फ़ोटो हटाएं",
+    "photo_hold_to_view": "देखने के लिए दबाए रखें",
+    "role_admin": "अडमिन",
+    "role_worker": "ASHA कर्मचारी",
+    "confirm_logout": "क्या लॉगआउट करना है?",
+    "confirm_logout_msg": "फिर से लॉगिन करके अकाउंट में आना होगा।",
+    "yes": "हाँ",
+    "no": "नहीं",
   };
 
   @override
