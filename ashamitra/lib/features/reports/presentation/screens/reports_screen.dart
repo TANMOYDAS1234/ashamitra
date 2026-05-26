@@ -1,4 +1,7 @@
+import 'dart:isolate';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:get/get.dart';
 import 'package:pdf/pdf.dart';
 import '../../../../shared/widgets/referral_map/referral_map_widget.dart';
@@ -15,6 +18,385 @@ import '../../../../shared/widgets/count_up.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../../shared/widgets/skeleton.dart';
 import '../../../patients/controller/patient_controller.dart';
+
+// Top-level so Isolate.run can capture it. Receives only plain-data args.
+Future<List<int>> _buildPdfBytes(
+    (Uint8List, Uint8List, List<Map<String, dynamic>>, String) args) async {
+  final (regularBytes, boldBytes, reports, generatedAt) = args;
+
+  pw.Font makeFont(Uint8List b) =>
+      b.isNotEmpty ? pw.Font.ttf(b.buffer.asByteData()) : pw.Font.helvetica();
+  final theme = pw.ThemeData.withFont(
+    base: makeFont(regularBytes),
+    bold: makeFont(boldBytes),
+    italic: makeFont(regularBytes),
+    boldItalic: makeFont(boldBytes),
+  );
+  final doc = pw.Document(theme: theme);
+
+  final total = reports.length;
+  final emergency = reports.where((r) => r['outcome'] == 'emergency').length;
+  final attention = reports.where((r) => r['outcome'] == 'attention').length;
+  final safe = reports.where((r) => r['outcome'] == 'safe').length;
+
+  final caseBreakdown = <String, int>{};
+  for (final r in reports) {
+    final label = r['caseLabel']?.toString() ?? 'অন্যান্য';
+    caseBreakdown[label] = (caseBreakdown[label] ?? 0) + 1;
+  }
+  final dangerFreq = <String, int>{};
+  for (final r in reports) {
+    for (final s in (r['dangerSigns'] as List? ?? []).cast<String>()) {
+      dangerFreq[s] = (dangerFreq[s] ?? 0) + 1;
+    }
+  }
+  final topDangerSigns = dangerFreq.entries.toList()
+    ..sort((a, b) => b.value.compareTo(a.value));
+
+  PdfColor bc(String o) => switch (o) {
+        'emergency' => const PdfColor.fromInt(0xFFDC2626),
+        'attention' => const PdfColor.fromInt(0xFFD97706),
+        _ => const PdfColor.fromInt(0xFF16A34A),
+      };
+  String bl(String o) => switch (o) {
+        'emergency' => 'RED — জরুরি',
+        'attention' => 'YELLOW — মনোযোগ দরকার',
+        _ => 'GREEN — নিরাপদ',
+      };
+  String fmtDate(String iso) {
+    try {
+      final dt = DateTime.parse(iso);
+      return '${dt.day}/${dt.month}/${dt.year}  '
+          '${dt.hour.toString().padLeft(2, '0')}:'
+          '${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return iso;
+    }
+  }
+
+  pw.Widget statBox(String label, String value, PdfColor color) => pw.Expanded(
+        child: pw.Container(
+          margin: const pw.EdgeInsets.symmetric(horizontal: 4),
+          padding: const pw.EdgeInsets.symmetric(vertical: 10),
+          decoration: pw.BoxDecoration(
+              color: color,
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6))),
+          child: pw.Column(children: [
+            pw.Text(value,
+                style: pw.TextStyle(
+                    fontSize: 20,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.white)),
+            pw.SizedBox(height: 2),
+            pw.Text(label,
+                style: const pw.TextStyle(fontSize: 9, color: PdfColors.white)),
+          ]),
+        ),
+      );
+
+  pw.Widget kvRow(String key, String value, {bool highlight = false}) =>
+      pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(vertical: 3),
+        child: pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.SizedBox(
+                width: 140,
+                child: pw.Text(key,
+                    style: pw.TextStyle(
+                        fontSize: 10,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.grey700))),
+            pw.Expanded(
+                child: pw.Text(value,
+                    style: pw.TextStyle(
+                        fontSize: 10,
+                        color: highlight
+                            ? const PdfColor.fromInt(0xFFDC2626)
+                            : PdfColors.grey900,
+                        fontWeight: highlight
+                            ? pw.FontWeight.bold
+                            : pw.FontWeight.normal))),
+          ],
+        ),
+      );
+
+  // Cover page
+  doc.addPage(pw.Page(
+    pageFormat: PdfPageFormat.a4,
+    margin: const pw.EdgeInsets.all(0),
+    build: (ctx) => pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        pw.Container(
+          color: const PdfColor.fromInt(0xFF4F46E5),
+          padding: const pw.EdgeInsets.fromLTRB(40, 48, 40, 40),
+          child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            pw.Text('আশামিত্র',
+                style: pw.TextStyle(fontSize: 32, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+            pw.SizedBox(height: 4),
+            pw.Text('ASHA Mitra — Clinical Triage Report',
+                style: const pw.TextStyle(fontSize: 14, color: PdfColors.white)),
+            pw.SizedBox(height: 20),
+            pw.Text('Generated: $generatedAt',
+                style: const pw.TextStyle(fontSize: 10, color: PdfColors.white)),
+            pw.Text('Total Sessions: $total',
+                style: const pw.TextStyle(fontSize: 10, color: PdfColors.white)),
+          ]),
+        ),
+        pw.Container(
+          color: const PdfColor.fromInt(0xFFF8F9FF),
+          padding: const pw.EdgeInsets.fromLTRB(36, 32, 36, 0),
+          child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            pw.Text('SUMMARY',
+                style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.grey600, letterSpacing: 1.5)),
+            pw.SizedBox(height: 12),
+            pw.Row(children: [
+              statBox('মোট কেস', '$total', const PdfColor.fromInt(0xFF4F46E5)),
+              statBox('জরুরি (RED)', '$emergency', const PdfColor.fromInt(0xFFDC2626)),
+              statBox('মনোযোগ (YELLOW)', '$attention', const PdfColor.fromInt(0xFFD97706)),
+              statBox('নিরাপদ (GREEN)', '$safe', const PdfColor.fromInt(0xFF16A34A)),
+            ]),
+            pw.SizedBox(height: 28),
+            pw.Text('CASE TYPE BREAKDOWN',
+                style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.grey600, letterSpacing: 1.5)),
+            pw.SizedBox(height: 10),
+            pw.TableHelper.fromTextArray(
+              headers: ['Case Type', 'Count', '% of Total'],
+              data: caseBreakdown.entries.map((e) => [e.key, '${e.value}', '${(e.value / total * 100).toStringAsFixed(1)}%']).toList(),
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.white),
+              headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF4F46E5)),
+              cellStyle: const pw.TextStyle(fontSize: 10),
+              cellAlignments: {0: pw.Alignment.centerLeft, 1: pw.Alignment.center, 2: pw.Alignment.center},
+              oddRowDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFF0F0FF)),
+            ),
+            if (topDangerSigns.isNotEmpty) ...[
+              pw.SizedBox(height: 24),
+              pw.Text('TOP DANGER SIGNS DETECTED',
+                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.grey600, letterSpacing: 1.5)),
+              pw.SizedBox(height: 10),
+              pw.TableHelper.fromTextArray(
+                headers: ['Danger Sign', 'Frequency'],
+                data: topDangerSigns.take(8).map((e) => [e.key, '${e.value} cases']).toList(),
+                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10, color: PdfColors.white),
+                headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFDC2626)),
+                cellStyle: const pw.TextStyle(fontSize: 10),
+                oddRowDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFFFF0F0)),
+              ),
+            ],
+          ]),
+        ),
+      ],
+    ),
+  ));
+
+  // Detail pages — single MultiPage, no batching needed (off UI thread)
+  doc.addPage(pw.MultiPage(
+    pageFormat: PdfPageFormat.a4,
+    margin: const pw.EdgeInsets.fromLTRB(36, 36, 36, 36),
+    maxPages: 500,
+    header: (ctx) => pw.Container(
+      padding: const pw.EdgeInsets.only(bottom: 8),
+      decoration: const pw.BoxDecoration(
+          border: pw.Border(bottom: pw.BorderSide(color: PdfColor.fromInt(0xFF4F46E5), width: 1.5))),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text('আশামিত্র — Triage Session Details',
+              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFF4F46E5))),
+          pw.Text('Page ${ctx.pageNumber} of ${ctx.pagesCount}',
+              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey500)),
+        ],
+      ),
+    ),
+    footer: (ctx) => pw.Container(
+      padding: const pw.EdgeInsets.only(top: 6),
+      decoration: const pw.BoxDecoration(
+          border: pw.Border(top: pw.BorderSide(color: PdfColors.grey300, width: 0.5))),
+      child: pw.Text(
+        'ASHA Mitra — Confidential Clinical Record  |  Generated $generatedAt',
+        style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey400),
+        textAlign: pw.TextAlign.center,
+      ),
+    ),
+    build: (ctx) => [
+      pw.Container(
+        margin: const pw.EdgeInsets.only(bottom: 12),
+        padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: const pw.BoxDecoration(
+          color: PdfColor.fromInt(0xFFEEF2FF),
+          borderRadius: pw.BorderRadius.all(pw.Radius.circular(4)),
+        ),
+        child: pw.Text('SESSION DETAILS  ($total records)',
+            style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFF3730A3))),
+      ),
+      ...reports.asMap().entries.map((entry) {
+        final idx = entry.key + 1;
+        final r = entry.value;
+        final outcome = r['outcome']?.toString() ?? 'safe';
+        final bandColor = bc(outcome);
+        final dangerSigns = (r['dangerSigns'] as List? ?? []).cast<String>();
+        final suspectedConditions = (r['suspectedConditions'] as List? ?? []).cast<String>();
+        final triggeredRules = (r['triggeredRules'] as List? ?? []).cast<String>();
+        final qaHistory = r['qaHistory'] as List? ?? [];
+        final riskScore = r['riskScore'] as int? ?? 0;
+        final recheckHours = r['recheckAfterHours'] as int? ?? 0;
+
+        return pw.Container(
+          margin: const pw.EdgeInsets.only(bottom: 16),
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(
+                color: PdfColor(
+                  (bandColor.red * 0.4 + 0.6).clamp(0.0, 1.0),
+                  (bandColor.green * 0.4 + 0.6).clamp(0.0, 1.0),
+                  (bandColor.blue * 0.4 + 0.6).clamp(0.0, 1.0),
+                ),
+                width: 1),
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+          ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              pw.Container(
+                padding: const pw.EdgeInsets.fromLTRB(12, 8, 12, 8),
+                decoration: pw.BoxDecoration(
+                  color: bandColor,
+                  borderRadius: const pw.BorderRadius.only(
+                    topLeft: pw.Radius.circular(5),
+                    topRight: pw.Radius.circular(5),
+                  ),
+                ),
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('#$idx  ${r['caseLabel']?.toString() ?? ''}',
+                        style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+                    pw.Text(bl(outcome),
+                        style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+                  ],
+                ),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.all(12),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    kvRow('Date / Time', fmtDate(r['createdAt']?.toString() ?? '')),
+                    kvRow('Patient Name', r['patientName']?.toString().isNotEmpty == true ? r['patientName'].toString() : 'Not recorded'),
+                    kvRow('Risk Score', riskScore > 0 ? '$riskScore / 100' : '—'),
+                    kvRow('Risk Level', r['riskLevel']?.toString().toUpperCase() ?? '—'),
+                    kvRow('Facility Referral', r['facilityType']?.toString().isNotEmpty == true ? r['facilityType'].toString() : '—'),
+                    if (recheckHours > 0) kvRow('Follow-up In', '$recheckHours hours'),
+                    if ((r['situation']?.toString() ?? '').isNotEmpty) ...[
+                      pw.SizedBox(height: 8),
+                      pw.Text('Situation Reported',
+                          style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),
+                      pw.SizedBox(height: 3),
+                      pw.Container(
+                        padding: const pw.EdgeInsets.all(8),
+                        decoration: const pw.BoxDecoration(
+                          color: PdfColor.fromInt(0xFFF8F9FF),
+                          borderRadius: pw.BorderRadius.all(pw.Radius.circular(4)),
+                        ),
+                        child: pw.Text(
+                          () { final s = r['situation'].toString(); return s.length > 800 ? '${s.substring(0, 800)}...' : s; }(),
+                          style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey800),
+                        ),
+                      ),
+                    ],
+                    pw.SizedBox(height: 8),
+                    pw.Text('Clinical Decision',
+                        style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),
+                    pw.SizedBox(height: 3),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColor(
+                          (bandColor.red * 0.08 + 0.92).clamp(0.0, 1.0),
+                          (bandColor.green * 0.08 + 0.92).clamp(0.0, 1.0),
+                          (bandColor.blue * 0.08 + 0.92).clamp(0.0, 1.0),
+                        ),
+                        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(r['reason']?.toString() ?? '',
+                              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey900)),
+                          if ((r['nextStep']?.toString() ?? '').isNotEmpty) ...[
+                            pw.SizedBox(height: 4),
+                            pw.Text('Next Step: ${r['nextStep']}',
+                                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: bandColor)),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (dangerSigns.isNotEmpty) ...[
+                      pw.SizedBox(height: 8),
+                      pw.Text('Danger Signs Detected',
+                          style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFFDC2626))),
+                      pw.SizedBox(height: 4),
+                      pw.Wrap(spacing: 6, runSpacing: 4,
+                        children: dangerSigns.map((s) => pw.Container(
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFFFEBEB), borderRadius: pw.BorderRadius.all(pw.Radius.circular(4))),
+                          child: pw.Text(s, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFFDC2626))),
+                        )).toList(),
+                      ),
+                    ],
+                    if (suspectedConditions.isNotEmpty) ...[
+                      pw.SizedBox(height: 8),
+                      pw.Text('Suspected Conditions',
+                          style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFFD97706))),
+                      pw.SizedBox(height: 4),
+                      pw.Wrap(spacing: 6, runSpacing: 4,
+                        children: suspectedConditions.map((s) => pw.Container(
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFFFFBEB), borderRadius: pw.BorderRadius.all(pw.Radius.circular(4))),
+                          child: pw.Text(s, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFFD97706))),
+                        )).toList(),
+                      ),
+                    ],
+                    if (triggeredRules.isNotEmpty) ...[
+                      pw.SizedBox(height: 8),
+                      pw.Text('Triggered Rules',
+                          style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),
+                      pw.SizedBox(height: 3),
+                      pw.Text(triggeredRules.join('  •  '),
+                          style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+                    ],
+                    if (qaHistory.isNotEmpty) ...[
+                      pw.SizedBox(height: 8),
+                      pw.Text(
+                          qaHistory.length > 8 ? 'Conversation Q&A  (first 8 of ${qaHistory.length})' : 'Conversation Q&A',
+                          style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),
+                      pw.SizedBox(height: 4),
+                      pw.TableHelper.fromTextArray(
+                        headers: ['Question', 'Answer'],
+                        data: qaHistory.take(8).map((qa) {
+                          final m = qa is Map ? qa : {};
+                          String trim(String s) => s.length > 300 ? '${s.substring(0, 300)}...' : s;
+                          return [trim(m['question']?.toString() ?? ''), trim(m['answer']?.toString() ?? '')];
+                        }).toList(),
+                        headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9, color: PdfColors.white),
+                        headerDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF6366F1)),
+                        cellStyle: const pw.TextStyle(fontSize: 9),
+                        columnWidths: {0: const pw.FlexColumnWidth(2), 1: const pw.FlexColumnWidth(3)},
+                        oddRowDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFF5F5FF)),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    ],
+  ));
+
+  return doc.save();
+}
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -81,160 +463,59 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
   }
 
-  // ── Band colour helpers for PDF ──────────────────────────────────────────
-  PdfColor _pdfBandColor(String outcome) => switch (outcome) {
-    'emergency' => const PdfColor.fromInt(0xFFDC2626),
-    'attention' => const PdfColor.fromInt(0xFFD97706),
-    _ => const PdfColor.fromInt(0xFF16A34A),
-  };
-
-  String _bandLabel(String outcome) => switch (outcome) {
-    'emergency' => 'RED — জরুরি',
-    'attention' => 'YELLOW — মনোযোগ দরকার',
-    _ => 'GREEN — নিরাপদ',
-  };
-
-  // ── Section heading widget ────────────────────────────────────────────────
-  pw.Widget _sectionHeading(String title) => pw.Container(
-        margin: const pw.EdgeInsets.only(top: 20, bottom: 8),
-        padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: const pw.BoxDecoration(
-          color: PdfColor.fromInt(0xFFEEF2FF),
-          borderRadius: pw.BorderRadius.all(pw.Radius.circular(4)),
-        ),
-        child: pw.Text(title,
-            style: pw.TextStyle(
-                fontSize: 12,
-                fontWeight: pw.FontWeight.bold,
-                color: const PdfColor.fromInt(0xFF3730A3))),
-      );
-
-  // ── Key-value row ─────────────────────────────────────────────────────────
-  pw.Widget _kvRow(String key, String value, {bool highlight = false}) =>
-      pw.Padding(
-        padding: const pw.EdgeInsets.symmetric(vertical: 3),
-        child: pw.Row(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.SizedBox(
-              width: 140,
-              child: pw.Text(key,
-                  style: pw.TextStyle(
-                      fontSize: 10,
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.grey700)),
-            ),
-            pw.Expanded(
-              child: pw.Text(value,
-                  style: pw.TextStyle(
-                      fontSize: 10,
-                      color: highlight
-                          ? const PdfColor.fromInt(0xFFDC2626)
-                          : PdfColors.grey900,
-                      fontWeight: highlight
-                          ? pw.FontWeight.bold
-                          : pw.FontWeight.normal)),
-            ),
-          ],
-        ),
-      );
-
-  // ── Stat box ──────────────────────────────────────────────────────────────
-  pw.Widget _statBox(String label, String value, PdfColor color) =>
-      pw.Expanded(
-        child: pw.Container(
-          margin: const pw.EdgeInsets.symmetric(horizontal: 4),
-          padding: const pw.EdgeInsets.symmetric(vertical: 10),
-          decoration: pw.BoxDecoration(
-            color: color,
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-          ),
-          child: pw.Column(
-            children: [
-              pw.Text(value,
-                  style: pw.TextStyle(
-                      fontSize: 20,
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.white)),
-              pw.SizedBox(height: 2),
-              pw.Text(label,
-                  style: const pw.TextStyle(
-                      fontSize: 9, color: PdfColors.white)),
-            ],
-          ),
-        ),
-      );
-
+  // ── PDF generation entry point ──────────────────────────────────────────
+  // The entire PDF build runs in a background isolate via [_buildPdfBytes]
+  // (top-level, above this class). This avoids:
+  //   - ANR — UI thread isn't blocked by the synchronous MultiPage layout
+  //   - OOM cascading into background services on the UI heap
+  //   - Frame stutter / BLASTBufferQueue overflow during spinner animation
+  //
+  // The four steps that remain on the UI thread are all cheap:
+  //   1. Show progress dialog
+  //   2. Load the bundled font bytes (rootBundle, ~250 KB ea, fast)
+  //   3. Send (fonts + reports + timestamp) to the isolate and await bytes
+  //   4. Hand the bytes off to PdfHelper.saveBytesAndOpen
   Future<void> _downloadPdf(List<Map<String, dynamic>> reports) async {
-    // Diagnostic milestones — these show up in logcat with [PDF] tag so any
-    // "stuck spinner" report can be pinpointed to the exact step that hung.
-    // Safe in release mode (print survives, only debugPrint is stripped).
     // ignore: avoid_print
     print('[PDF] start — reports.length=${reports.length}');
-    // Defense-in-depth: catch ANY exception thrown during font load, page
-    // assembly, or save. Previously a font-network failure or a malformed
-    // report row would propagate as an unhandled exception, crashing the
-    // app in release builds (where R8 strips most error UI). Now the worst
-    // case is a red snackbar with the actual error message.
+    if (reports.isEmpty) {
+      Get.snackbar(
+        'No reports to export',
+        'Complete at least one triage session first.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.warningYellow,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
+        duration: const Duration(seconds: 3),
+      );
+      return;
+    }
+
+    // 30-report cap so the isolate's heap and the PDF page count both stay
+    // bounded. Worker exports newest 30 and gets a heads-up to filter by
+    // date range for older sessions.
+    const maxReportsPerPdf = 30;
+    final wasTruncated = reports.length > maxReportsPerPdf;
+    if (wasTruncated) reports = reports.take(maxReportsPerPdf).toList();
+    if (wasTruncated) {
+      Get.snackbar(
+        'PDF limited to 30 reports',
+        'Latest 30 sessions included. Use the date filter '
+            '(আজ / ৭ দিন / এই মাস) to export earlier sessions.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.warningYellow,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
+        duration: const Duration(seconds: 4),
+      );
+      await Future.delayed(const Duration(milliseconds: 300));
+    }
+
     var dialogShown = false;
     try {
-      // Hard cap on report count per PDF. The `pdf` package accumulates the
-      // entire document in memory before save. Each report can be 1-2 pages
-      // of complex content (header bar + KV rows + danger sign chips +
-      // suspected condition chips + triggered rules + Q&A table) — at
-      // ~5-10 MB per report in graphics-object memory, even with largeHeap
-      // we OOM around 40-50 reports. 30 is a safe ceiling with margin.
-      //
-      // When the worker exceeds the cap, we silently keep the most recent
-      // 30 and tell them how to get the rest (apply a time/band filter).
-      const maxReportsPerPdf = 30;
-      final wasTruncated = reports.length > maxReportsPerPdf;
-      if (wasTruncated) {
-        reports = reports.take(maxReportsPerPdf).toList();
-      }
-
-      // Empty-list guard. PDF generation on zero reports would technically
-      // succeed (an empty document), but the percentage math hits 0/0 and
-      // some report-row code paths assume at least one entry. Easier to
-      // tell the user "nothing to export" than to render a blank file.
-      if (reports.isEmpty) {
-        Get.snackbar(
-          'No reports to export',
-          'Complete at least one triage session first.',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: AppColors.warningYellow,
-          colorText: Colors.white,
-          margin: const EdgeInsets.all(16),
-          borderRadius: 12,
-          duration: const Duration(seconds: 3),
-        );
-        return;
-      }
-
-      // If we truncated, tell the worker so they understand they're getting
-      // the most recent 30 — and how to export the rest (filter by date).
-      if (wasTruncated) {
-        Get.snackbar(
-          'PDF limited to 30 reports',
-          'Latest 30 sessions included. Use the date filter '
-              '(আজ / ৭ দিন / এই মাস) to export earlier sessions.',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: AppColors.warningYellow,
-          colorText: Colors.white,
-          margin: const EdgeInsets.all(16),
-          borderRadius: 12,
-          duration: const Duration(seconds: 4),
-        );
-        // Tiny delay so the snackbar visibly appears before the dialog covers
-        // the screen. Pure UX — no functional impact.
-        await Future.delayed(const Duration(milliseconds: 300));
-      }
-
-      // Non-dismissible progress dialog so the user has visible feedback
-      // during the (possibly multi-second) PDF generation. Without this the
-      // app appeared frozen and Android's input dispatcher would kill it as
-      // ANR after 5 seconds of UI-thread blocking. The finally below ALWAYS
-      // dismisses, even on exception, so the worker is never stuck.
+      // 1. Show the progress dialog.
       Get.dialog<void>(
         const PopScope(
           canPop: false,
@@ -258,555 +539,46 @@ class _ReportsScreenState extends State<ReportsScreen> {
       );
       dialogShown = true;
       // ignore: avoid_print
-      print('[PDF] dialog shown, loading font');
+      print('[PDF] dialog shown — loading font bytes');
 
-      final theme = await PdfHelper.bengaliTheme();
+      // 2. Load font bytes from the APK bundle. Fast (assets are mmap'd) and
+      // produces serializable Uint8List that can cross the isolate boundary.
+      final regularData = await rootBundle.load('assets/fonts/HindSiliguri-Regular.ttf');
+      final boldData    = await rootBundle.load('assets/fonts/HindSiliguri-Bold.ttf');
+      final regularBytes = regularData.buffer.asUint8List();
+      final boldBytes    = boldData.buffer.asUint8List();
       // ignore: avoid_print
-      print('[PDF] font loaded, creating document');
-      final doc = pw.Document(theme: theme);
+      print('[PDF] fonts loaded (${regularBytes.length} + ${boldBytes.length} bytes) — spawning isolate');
+
       final now = DateTime.now();
       final generatedAt =
           '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}  '
           '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
-      final total = reports.length;
-    final emergency = reports.where((r) => r['outcome'] == 'emergency').length;
-    final attention = reports.where((r) => r['outcome'] == 'attention').length;
-    final safe = reports.where((r) => r['outcome'] == 'safe').length;
+      // 3. Build the whole PDF in a background isolate. The closure captures
+      // only the serializable tuple — no `this`, no Flutter framework objects.
+      final bytes = await Isolate.run(
+        () => _buildPdfBytes((regularBytes, boldBytes, reports, generatedAt)),
+      );
+      // ignore: avoid_print
+      print('[PDF] isolate returned ${bytes.length} bytes — dismissing dialog');
 
-    // ── Case type breakdown ───────────────────────────────────────────────
-    final caseBreakdown = <String, int>{};
-    for (final r in reports) {
-      final label = r['caseLabel']?.toString() ?? 'অন্যান্য';
-      caseBreakdown[label] = (caseBreakdown[label] ?? 0) + 1;
-    }
-
-    // ── Danger sign frequency ─────────────────────────────────────────────
-    final dangerFreq = <String, int>{};
-    for (final r in reports) {
-      for (final s in (r['dangerSigns'] as List? ?? []).cast<String>()) {
-        dangerFreq[s] = (dangerFreq[s] ?? 0) + 1;
+      // Dismiss the dialog BEFORE saveAndOpen so the success snackbar isn't
+      // covered by the modal overlay and OpenFile's viewer can take focus.
+      if (dialogShown && (Get.isDialogOpen ?? false)) {
+        Get.back();
+        dialogShown = false;
       }
-    }
-    final topDangerSigns = dangerFreq.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
 
-    // ── Page 1: Cover ─────────────────────────────────────────────────────
-    doc.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(0),
-        build: (ctx) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-          children: [
-            // Header band
-            pw.Container(
-              color: const PdfColor.fromInt(0xFF4F46E5),
-              padding: const pw.EdgeInsets.fromLTRB(40, 48, 40, 40),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text('আশামিত্র',
-                      style: pw.TextStyle(
-                          fontSize: 32,
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColors.white)),
-                  pw.SizedBox(height: 4),
-                  pw.Text('ASHA Mitra — Clinical Triage Report',
-                      style: const pw.TextStyle(
-                          fontSize: 14, color: PdfColors.white)),
-                  pw.SizedBox(height: 20),
-                  pw.Text('Generated: $generatedAt',
-                      style: const pw.TextStyle(
-                          fontSize: 10, color: PdfColors.white)),
-                  pw.Text('Total Sessions: $total',
-                      style: const pw.TextStyle(
-                          fontSize: 10, color: PdfColors.white)),
-                ],
-              ),
-            ),
-            // Summary stat boxes
-            pw.Container(
-              color: const PdfColor.fromInt(0xFFF8F9FF),
-              padding: const pw.EdgeInsets.fromLTRB(36, 32, 36, 0),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text('SUMMARY',
-                      style: pw.TextStyle(
-                          fontSize: 11,
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColors.grey600,
-                          letterSpacing: 1.5)),
-                  pw.SizedBox(height: 12),
-                  pw.Row(
-                    children: [
-                      _statBox('মোট কেস', '$total',
-                          const PdfColor.fromInt(0xFF4F46E5)),
-                      _statBox('জরুরি (RED)', '$emergency',
-                          const PdfColor.fromInt(0xFFDC2626)),
-                      _statBox('মনোযোগ (YELLOW)', '$attention',
-                          const PdfColor.fromInt(0xFFD97706)),
-                      _statBox('নিরাপদ (GREEN)', '$safe',
-                          const PdfColor.fromInt(0xFF16A34A)),
-                    ],
-                  ),
-                  pw.SizedBox(height: 28),
-                  // Case type breakdown table
-                  pw.Text('CASE TYPE BREAKDOWN',
-                      style: pw.TextStyle(
-                          fontSize: 11,
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColors.grey600,
-                          letterSpacing: 1.5)),
-                  pw.SizedBox(height: 10),
-                  pw.TableHelper.fromTextArray(
-                    headers: ['Case Type', 'Count', '% of Total'],
-                    data: caseBreakdown.entries
-                        .map((e) => [
-                              e.key,
-                              '${e.value}',
-                              '${(e.value / total * 100).toStringAsFixed(1)}%',
-                            ])
-                        .toList(),
-                    headerStyle: pw.TextStyle(
-                        fontWeight: pw.FontWeight.bold,
-                        fontSize: 10,
-                        color: PdfColors.white),
-                    headerDecoration: const pw.BoxDecoration(
-                        color: PdfColor.fromInt(0xFF4F46E5)),
-                    cellStyle: const pw.TextStyle(fontSize: 10),
-                    cellAlignments: {
-                      0: pw.Alignment.centerLeft,
-                      1: pw.Alignment.center,
-                      2: pw.Alignment.center,
-                    },
-                    oddRowDecoration: const pw.BoxDecoration(
-                        color: PdfColor.fromInt(0xFFF0F0FF)),
-                  ),
-                  if (topDangerSigns.isNotEmpty) ...[
-                    pw.SizedBox(height: 24),
-                    pw.Text('TOP DANGER SIGNS DETECTED',
-                        style: pw.TextStyle(
-                            fontSize: 11,
-                            fontWeight: pw.FontWeight.bold,
-                            color: PdfColors.grey600,
-                            letterSpacing: 1.5)),
-                    pw.SizedBox(height: 10),
-                    pw.TableHelper.fromTextArray(
-                      headers: ['Danger Sign', 'Frequency'],
-                      data: topDangerSigns
-                          .take(8)
-                          .map((e) => [e.key, '${e.value} cases'])
-                          .toList(),
-                      headerStyle: pw.TextStyle(
-                          fontWeight: pw.FontWeight.bold,
-                          fontSize: 10,
-                          color: PdfColors.white),
-                      headerDecoration: const pw.BoxDecoration(
-                          color: PdfColor.fromInt(0xFFDC2626)),
-                      cellStyle: const pw.TextStyle(fontSize: 10),
-                      oddRowDecoration: const pw.BoxDecoration(
-                          color: PdfColor.fromInt(0xFFFFF0F0)),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    // ── Pages 2+: Per-session detail ──────────────────────────────────────
-    // Why we batch (and why each batch is its own addPage call):
-    //   The pdf package runs MultiPage layout SYNCHRONOUSLY inside addPage.
-    //   With ~30+ reports, layout takes >5 seconds on the UI thread →
-    //   Android's input dispatcher kills the app with ANR. Splitting into
-    //   small batches with `await Future.delayed(Duration.zero)` between
-    //   them lets the UI thread service touch events / repaint the loading
-    //   spinner, so the OS never declares the app unresponsive.
-    //
-    //   batchSize = 6 keeps each addPage call under ~1.5 seconds even for
-    //   heavy reports with full Q&A history + multiple danger signs.
-    const batchSize = 6;
-    final totalRecords = reports.length;
-    // ignore: avoid_print
-    print('[PDF] starting per-session detail — totalRecords=$totalRecords batchSize=$batchSize');
-    for (int batchStart = 0; batchStart < reports.length; batchStart += batchSize) {
-      // Yield to the event loop — this is the key step that prevents ANR.
-      await Future.delayed(Duration.zero);
-      final batchEnd = (batchStart + batchSize).clamp(0, reports.length);
-      final batchReports = reports.sublist(batchStart, batchEnd);
-      final isFirstBatch = batchStart == 0;
-      final batchOffset = batchStart; // for absolute report numbering
+      // 4. Persist + open via PdfHelper. Snackbar fires inside on result.
+      final fileName =
+          'asha_mitra_report_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}.pdf';
+      await PdfHelper.saveBytesAndOpen(bytes, fileName);
       // ignore: avoid_print
-      print('[PDF] addPage batch ${batchStart ~/ batchSize + 1}: reports $batchStart..${batchEnd - 1}');
-
-      doc.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.fromLTRB(36, 36, 36, 36),
-        // 500-page safety cap per MultiPage. With our batchSize of 6
-        // reports per call (avg 1-2 pages each), we'll never approach this.
-        maxPages: 500,
-        header: (ctx) => pw.Container(
-          padding: const pw.EdgeInsets.only(bottom: 8),
-          decoration: const pw.BoxDecoration(
-              border: pw.Border(
-                  bottom: pw.BorderSide(
-                      color: PdfColor.fromInt(0xFF4F46E5), width: 1.5))),
-          child: pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text('আশামিত্র — Triage Session Details',
-                  style: pw.TextStyle(
-                      fontSize: 10,
-                      fontWeight: pw.FontWeight.bold,
-                      color: const PdfColor.fromInt(0xFF4F46E5))),
-              pw.Text('Page ${ctx.pageNumber} of ${ctx.pagesCount}',
-                  style: const pw.TextStyle(
-                      fontSize: 9, color: PdfColors.grey500)),
-            ],
-          ),
-        ),
-        footer: (ctx) => pw.Container(
-          padding: const pw.EdgeInsets.only(top: 6),
-          decoration: const pw.BoxDecoration(
-              border: pw.Border(
-                  top: pw.BorderSide(
-                      color: PdfColors.grey300, width: 0.5))),
-          child: pw.Text(
-            'ASHA Mitra — Confidential Clinical Record  |  Generated $generatedAt',
-            style: const pw.TextStyle(
-                fontSize: 8, color: PdfColors.grey400),
-            textAlign: pw.TextAlign.center,
-          ),
-        ),
-        build: (ctx) => [
-          if (isFirstBatch)
-            _sectionHeading('SESSION DETAILS  ($totalRecords records)'),
-          ...batchReports.asMap().entries.map((entry) {
-            final idx = entry.key + batchOffset + 1;
-            final r = entry.value;
-            final outcome = r['outcome']?.toString() ?? 'safe';
-            final bandColor = _pdfBandColor(outcome);
-            final dangerSigns =
-                (r['dangerSigns'] as List? ?? []).cast<String>();
-            final suspectedConditions =
-                (r['suspectedConditions'] as List? ?? []).cast<String>();
-            final triggeredRules =
-                (r['triggeredRules'] as List? ?? []).cast<String>();
-            final qaHistory = r['qaHistory'] as List? ?? [];
-            final riskScore = r['riskScore'] as int? ?? 0;
-            final recheckHours = r['recheckAfterHours'] as int? ?? 0;
-
-            return pw.Container(
-              margin: const pw.EdgeInsets.only(bottom: 16),
-              decoration: pw.BoxDecoration(
-                border: pw.Border.all(
-                    color: PdfColor(
-                      (bandColor.red * 0.4 + 0.6).clamp(0.0, 1.0),
-                      (bandColor.green * 0.4 + 0.6).clamp(0.0, 1.0),
-                      (bandColor.blue * 0.4 + 0.6).clamp(0.0, 1.0),
-                    ),
-                    width: 1),
-                borderRadius:
-                    const pw.BorderRadius.all(pw.Radius.circular(6)),
-              ),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-                children: [
-                  // ── Session header bar ──────────────────────────────────
-                  pw.Container(
-                    padding: const pw.EdgeInsets.fromLTRB(12, 8, 12, 8),
-                    decoration: pw.BoxDecoration(
-                      color: bandColor,
-                      borderRadius: const pw.BorderRadius.only(
-                        topLeft: pw.Radius.circular(5),
-                        topRight: pw.Radius.circular(5),
-                      ),
-                    ),
-                    child: pw.Row(
-                      mainAxisAlignment:
-                          pw.MainAxisAlignment.spaceBetween,
-                      children: [
-                        pw.Text(
-                          '#$idx  ${r['caseLabel']?.toString() ?? ''}',
-                          style: pw.TextStyle(
-                              fontSize: 11,
-                              fontWeight: pw.FontWeight.bold,
-                              color: PdfColors.white),
-                        ),
-                        pw.Text(
-                          _bandLabel(outcome),
-                          style: pw.TextStyle(
-                              fontSize: 10,
-                              fontWeight: pw.FontWeight.bold,
-                              color: PdfColors.white),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // ── Session body ────────────────────────────────────────
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.all(12),
-                    child: pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        // Basic info
-                        _kvRow('Date / Time',
-                            _formatDate(r['createdAt']?.toString() ?? '')),
-                        _kvRow('Patient Name',
-                            r['patientName']?.toString().isNotEmpty == true
-                                ? r['patientName'].toString()
-                                : 'Not recorded'),
-                        _kvRow('Risk Score',
-                            riskScore > 0 ? '$riskScore / 100' : '—'),
-                        _kvRow('Risk Level',
-                            r['riskLevel']?.toString().toUpperCase() ?? '—'),
-                        _kvRow('Facility Referral',
-                            r['facilityType']?.toString().isNotEmpty == true
-                                ? r['facilityType'].toString()
-                                : '—'),
-                        if (recheckHours > 0)
-                          _kvRow('Follow-up In', '$recheckHours hours'),
-
-                        // Situation
-                        if ((r['situation']?.toString() ?? '').isNotEmpty) ...[
-                          pw.SizedBox(height: 8),
-                          pw.Text('Situation Reported',
-                              style: pw.TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: pw.FontWeight.bold,
-                                  color: PdfColors.grey700)),
-                          pw.SizedBox(height: 3),
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(8),
-                            decoration: const pw.BoxDecoration(
-                              color: PdfColor.fromInt(0xFFF8F9FF),
-                              borderRadius: pw.BorderRadius.all(
-                                  pw.Radius.circular(4)),
-                            ),
-                            child: pw.Text(
-                              () {
-                                final s = r['situation'].toString();
-                                return s.length > 800
-                                    ? '${s.substring(0, 800)}...'
-                                    : s;
-                              }(),
-                              style: const pw.TextStyle(
-                                  fontSize: 10,
-                                  color: PdfColors.grey800),
-                            ),
-                          ),
-                        ],
-
-                        // Clinical decision
-                        pw.SizedBox(height: 8),
-                        pw.Text('Clinical Decision',
-                            style: pw.TextStyle(
-                                fontSize: 10,
-                                fontWeight: pw.FontWeight.bold,
-                                color: PdfColors.grey700)),
-                        pw.SizedBox(height: 3),
-                        pw.Container(
-                          padding: const pw.EdgeInsets.all(8),
-                          decoration: pw.BoxDecoration(
-                            color: PdfColor(
-                                (bandColor.red * 0.08 + 0.92).clamp(0.0, 1.0),
-                                (bandColor.green * 0.08 + 0.92).clamp(0.0, 1.0),
-                                (bandColor.blue * 0.08 + 0.92).clamp(0.0, 1.0),
-                              ),
-                            borderRadius: const pw.BorderRadius.all(
-                                pw.Radius.circular(4)),
-                          ),
-                          child: pw.Column(
-                            crossAxisAlignment: pw.CrossAxisAlignment.start,
-                            children: [
-                              pw.Text(
-                                r['reason']?.toString() ?? '',
-                                style: const pw.TextStyle(
-                                    fontSize: 10,
-                                    color: PdfColors.grey900),
-                              ),
-                              if ((r['nextStep']?.toString() ?? '').isNotEmpty) ...[
-                                pw.SizedBox(height: 4),
-                                pw.Text(
-                                  'Next Step: ${r['nextStep']}',
-                                  style: pw.TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: pw.FontWeight.bold,
-                                      color: bandColor),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-
-                        // Danger signs
-                        if (dangerSigns.isNotEmpty) ...[
-                          pw.SizedBox(height: 8),
-                          pw.Text('Danger Signs Detected',
-                              style: pw.TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: pw.FontWeight.bold,
-                                  color: const PdfColor.fromInt(0xFFDC2626))),
-                          pw.SizedBox(height: 4),
-                          pw.Wrap(
-                            spacing: 6,
-                            runSpacing: 4,
-                            children: dangerSigns
-                                .map((s) => pw.Container(
-                                      padding: const pw.EdgeInsets.symmetric(
-                                          horizontal: 7, vertical: 3),
-                                      decoration: const pw.BoxDecoration(
-                                        color:
-                                            PdfColor.fromInt(0xFFFFEBEB),
-                                        borderRadius: pw.BorderRadius.all(
-                                            pw.Radius.circular(4)),
-                                      ),
-                                      child: pw.Text(s,
-                                          style: pw.TextStyle(
-                                              fontSize: 9,
-                                              fontWeight:
-                                                  pw.FontWeight.bold,
-                                              color: const PdfColor
-                                                  .fromInt(0xFFDC2626))),
-                                    ))
-                                .toList(),
-                          ),
-                        ],
-
-                        // Suspected conditions
-                        if (suspectedConditions.isNotEmpty) ...[
-                          pw.SizedBox(height: 8),
-                          pw.Text('Suspected Conditions',
-                              style: pw.TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: pw.FontWeight.bold,
-                                  color: const PdfColor.fromInt(0xFFD97706))),
-                          pw.SizedBox(height: 4),
-                          pw.Wrap(
-                            spacing: 6,
-                            runSpacing: 4,
-                            children: suspectedConditions
-                                .map((s) => pw.Container(
-                                      padding: const pw.EdgeInsets.symmetric(
-                                          horizontal: 7, vertical: 3),
-                                      decoration: const pw.BoxDecoration(
-                                        color:
-                                            PdfColor.fromInt(0xFFFFFBEB),
-                                        borderRadius: pw.BorderRadius.all(
-                                            pw.Radius.circular(4)),
-                                      ),
-                                      child: pw.Text(s,
-                                          style: pw.TextStyle(
-                                              fontSize: 9,
-                                              fontWeight:
-                                                  pw.FontWeight.bold,
-                                              color: const PdfColor
-                                                  .fromInt(0xFFD97706))),
-                                    ))
-                                .toList(),
-                          ),
-                        ],
-
-                        // Triggered rules
-                        if (triggeredRules.isNotEmpty) ...[
-                          pw.SizedBox(height: 8),
-                          pw.Text('Triggered Rules',
-                              style: pw.TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: pw.FontWeight.bold,
-                                  color: PdfColors.grey700)),
-                          pw.SizedBox(height: 3),
-                          pw.Text(
-                            triggeredRules.join('  •  '),
-                            style: const pw.TextStyle(
-                                fontSize: 9, color: PdfColors.grey600),
-                          ),
-                        ],
-
-                        // Q&A history — capped + truncated to prevent the
-                        // pdf package's TableHelper from producing an
-                        // unbreakable widget that infinite-loops MultiPage
-                        // pagination (TooManyPagesException at 500-page cap).
-                        //
-                        // The package can't split a single tall cell across
-                        // pages, so very long answers force the whole table
-                        // onto a "ghost" oversized page that never fits,
-                        // and MultiPage retries forever until maxPages.
-                        //
-                        // Bounds applied:
-                        //   - first 8 Q&A entries only (rest gets a count note)
-                        //   - each question/answer truncated to 300 chars
-                        //   (~3 lines of cell content), so no single row is
-                        //   ever taller than a quarter page.
-                        if (qaHistory.isNotEmpty) ...[
-                          pw.SizedBox(height: 8),
-                          pw.Text(
-                              qaHistory.length > 8
-                                  ? 'Conversation Q&A  (first 8 of ${qaHistory.length})'
-                                  : 'Conversation Q&A',
-                              style: pw.TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: pw.FontWeight.bold,
-                                  color: PdfColors.grey700)),
-                          pw.SizedBox(height: 4),
-                          pw.TableHelper.fromTextArray(
-                            headers: ['Question', 'Answer'],
-                            data: qaHistory.take(8).map((qa) {
-                              final m = qa is Map ? qa : {};
-                              String trim(String s) => s.length > 300
-                                  ? '${s.substring(0, 300)}...'
-                                  : s;
-                              return [
-                                trim(m['question']?.toString() ?? ''),
-                                trim(m['answer']?.toString() ?? ''),
-                              ];
-                            }).toList(),
-                            headerStyle: pw.TextStyle(
-                                fontWeight: pw.FontWeight.bold,
-                                fontSize: 9,
-                                color: PdfColors.white),
-                            headerDecoration: const pw.BoxDecoration(
-                                color: PdfColor.fromInt(0xFF6366F1)),
-                            cellStyle:
-                                const pw.TextStyle(fontSize: 9),
-                            columnWidths: {
-                              0: const pw.FlexColumnWidth(2),
-                              1: const pw.FlexColumnWidth(3),
-                            },
-                            oddRowDecoration: const pw.BoxDecoration(
-                                color: PdfColor.fromInt(0xFFF5F5FF)),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-    } // ── end of for-loop over batches ─────────────────────────────────────
-
-      // ignore: avoid_print
-      print('[PDF] all batches addPage-done, calling saveAndOpen');
-      // Yield once more before save so the UI thread can repaint the spinner.
-      await Future.delayed(Duration.zero);
-      await PdfHelper.saveAndOpen(
-          doc,
-          'asha_mitra_report_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}.pdf');
-      // ignore: avoid_print
-      print('[PDF] saveAndOpen returned');
+      print('[PDF] saveBytesAndOpen returned');
     } catch (e, st) {
-      // Never let a PDF-build failure crash the app. Show the user the real
-      // error (truncated) so they can report it; full stack stays in logcat.
+      // Any failure — font load, isolate spawn, isolate work, file save —
+      // surfaces here as a red snackbar instead of a silent crash.
       // ignore: avoid_print
       print('[PDF] build failed: $e\n$st');
       Get.snackbar(
@@ -822,14 +594,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
         duration: const Duration(seconds: 6),
       );
     } finally {
-      // ignore: avoid_print
-      print('[PDF] finally: dialogShown=$dialogShown isDialogOpen=${Get.isDialogOpen}');
-      // ALWAYS dismiss the progress dialog, success or failure. Without this
-      // an exception would leave the worker stuck staring at a spinner.
+      // Dialog should already be dismissed on the success path; this is the
+      // safety net for the catch path so the worker is never stuck on a
+      // spinner that won't go away.
       if (dialogShown && (Get.isDialogOpen ?? false)) {
         Get.back();
-        // ignore: avoid_print
-        print('[PDF] dialog dismissed');
       }
     }
   }
