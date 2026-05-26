@@ -23,11 +23,11 @@ class VapiTtsService {
   static const _cacheLimit = 60 * 1024 * 1024; // 60 MB max cache
   // Cache-key tag only — actual voice is chosen server-side.
   // Bump this string when switching voices so old cached MP3s are not replayed.
-  // Bumped from Leda to Charon (senior-doctor male voice). Bumping this tag
-  // invalidates every device's cached MP3s — the next prewarm cycle will
-  // re-fetch all phrases with the new voice. Without this bump, old Leda
-  // audio would keep playing forever from cache.
-  static const _voice = 'gcloud:Chirp3-HD-Charon:v1';
+  // Bumped from Charon (male) to Kore (mature authoritative female).
+  // Bumping this tag invalidates every device's cached MP3s — the next
+  // prewarm cycle will re-fetch all phrases with the new voice. Without
+  // this bump, old audio would keep playing from cache.
+  static const _voice = 'gcloud:Chirp3-HD-Kore:v1';
 
   Function()? onStart;
   Function()? onComplete;

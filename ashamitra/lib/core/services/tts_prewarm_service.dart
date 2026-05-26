@@ -26,7 +26,7 @@ import 'vapi_tts_service.dart';
 /// Pilot of 50 ASHAs ≈ $37.50 one-time. Runs silent in background.
 class TtsPrewarmService {
   static const _prefsKey = 'tts_prewarm_version';
-  static const _currentVersion = 'charon_v3_2026_05';
+  static const _currentVersion = 'kore_v4_2026_05';
 
   /// Tones that match the actual usage at the call site:
   ///   - question  : triage Q&A
