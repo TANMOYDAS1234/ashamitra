@@ -179,12 +179,22 @@ class _AssistantScreenState extends State<AssistantScreen> {
     });
 
     if (response.text.isNotEmpty) {
-      // Try to switch device-TTS to the matching locale on the fly. Falls
-      // back gracefully if the locale isn't installed on the device.
       try {
         await _tts.stop(); // ensure no overlap with auto-listen restart
       } catch (_) {}
-      await _tts.speak(response.text, tone: TtsTone.normal);
+      // Prefer pre-synthesized bytes from /chat-with-voice — one fewer
+      // network round-trip, voice arrives with the text instead of a
+      // beat behind. Falls back to /tts via _tts.speak otherwise.
+      if (response.prefetchedAudio != null &&
+          response.prefetchedAudio!.isNotEmpty) {
+        await _tts.speakBytes(
+          response.prefetchedAudio!,
+          text: response.text,
+          tone: TtsTone.normal,
+        );
+      } else {
+        await _tts.speak(response.text, tone: TtsTone.normal);
+      }
     }
   }
 
@@ -428,8 +438,15 @@ class _ConversationView extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.auto_awesome_rounded,
-                  size: 48, color: AppColors.primary.withValues(alpha: 0.55)),
+              // App's own logo instead of the generic AI sparkle —
+              // pilot listeners associated the star with Gemini.
+              Opacity(
+                opacity: 0.65,
+                child: Image.asset(
+                  'assets/images/ashalogo.png',
+                  width: 56, height: 56,
+                ),
+              ),
               const SizedBox(height: 16),
               Text(
                 'যা ইচ্ছা জিজ্ঞেস করুন',
@@ -490,8 +507,16 @@ class _MessageBubble extends StatelessWidget {
                 shape: BoxShape.circle,
                 boxShadow: AppShadows.tinted(AppColors.primary),
               ),
-              child: const Icon(Icons.auto_awesome_rounded,
-                  size: 16, color: Colors.white),
+              padding: const EdgeInsets.all(5),
+              // AshaMitra logo as the assistant avatar — tinted white
+              // so the brand mark reads cleanly against the gradient.
+              child: const ColorFiltered(
+                colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                child: Image(
+                  image: AssetImage('assets/images/ashalogo.png'),
+                  fit: BoxFit.contain,
+                ),
+              ),
             ),
             const SizedBox(width: 10),
           ],

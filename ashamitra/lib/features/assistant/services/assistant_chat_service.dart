@@ -19,6 +19,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../../core/constants/api_constants.dart';
+import '../../../core/services/api_service.dart';
 
 enum AssistantLang { bn, hi, en }
 
@@ -78,11 +79,18 @@ class AssistantResponse {
   /// warrants saving a record).
   final bool shouldOfferSave;
 
+  /// MP3 bytes returned by the combined /chat-with-voice endpoint.
+  /// When non-null the caller can play these directly via
+  /// [TtsService.speakBytes] and skip the separate /tts round-trip,
+  /// saving ~200-500ms on Render cold-start / weak signal.
+  final List<int>? prefetchedAudio;
+
   const AssistantResponse({
     required this.text,
     required this.detectedLanguage,
     required this.isClinical,
     required this.shouldOfferSave,
+    this.prefetchedAudio,
   });
 }
 
@@ -101,29 +109,57 @@ class AssistantChatService {
       appLanguage: appLanguage,
     );
 
-    http.Response? res;
+    // Combined /chat-with-voice — one round-trip for text + MP3 instead
+    // of the legacy two-call pattern. voiceField='spoken_text' tells the
+    // server to pull only that sub-field from the LLM's structured JSON
+    // for synthesis (so the user doesn't hear "is_clinical: true" etc).
+    Map<String, dynamic>? body;
     try {
-      res = await http
-          .post(
-            Uri.parse('${ApiConstants.baseUrl}/chat'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'prompt': prompt}),
-          )
-          .timeout(const Duration(seconds: 25));
-    } catch (_) {
-      return _offlineFallback(userInput, appLanguage);
+      body = await ApiService.chatWithVoice(
+        prompt: prompt,
+        voiceField: 'spoken_text',
+        tone: 'normal',
+        timeout: const Duration(seconds: 25),
+      );
+    } catch (_) { /* fall through to offline */ }
+
+    // Fall back to legacy /api/chat if combined endpoint failed (e.g.
+    // older server before the route landed, or transient 503).
+    if (body == null) {
+      http.Response? res;
+      try {
+        res = await http
+            .post(
+              Uri.parse('${ApiConstants.baseUrl}/chat'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'prompt': prompt}),
+            )
+            .timeout(const Duration(seconds: 25));
+      } catch (_) {
+        return _offlineFallback(userInput, appLanguage);
+      }
+      if (res.statusCode != 200) {
+        return _offlineFallback(userInput, appLanguage);
+      }
+      body = jsonDecode(res.body) as Map<String, dynamic>;
     }
 
-    if (res.statusCode != 200) {
-      return _offlineFallback(userInput, appLanguage);
-    }
-
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
     final raw = (body['text'] as String? ?? '')
         .trim()
         .replaceAll('```json', '')
         .replaceAll('```', '')
         .trim();
+
+    // Decode prefetched MP3 (only present from /chat-with-voice). If the
+    // legacy path or a TTS-synthesis failure leaves it null, the screen
+    // falls back to a second /api/tts call via _tts.speak.
+    List<int>? audioBytes;
+    final audioB64 = body['audio'] as String?;
+    if (audioB64 != null && audioB64.isNotEmpty) {
+      try {
+        audioBytes = base64Decode(audioB64);
+      } catch (_) { /* fall back to /tts */ }
+    }
 
     try {
       final j = jsonDecode(raw) as Map<String, dynamic>;
@@ -132,6 +168,7 @@ class AssistantChatService {
         detectedLanguage: _parseLang(j['detected_language']?.toString() ?? appLanguage.code),
         isClinical: (j['is_clinical'] as bool?) ?? false,
         shouldOfferSave: (j['should_offer_save'] as bool?) ?? false,
+        prefetchedAudio: audioBytes,
       );
     } catch (_) {
       // LLM returned plain text, not JSON — still useful. Use raw as the
@@ -141,6 +178,7 @@ class AssistantChatService {
         detectedLanguage: _heuristicLang(userInput, appLanguage),
         isClinical: false,
         shouldOfferSave: false,
+        prefetchedAudio: audioBytes,
       );
     }
   }
