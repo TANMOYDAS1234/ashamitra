@@ -531,16 +531,26 @@ class PatientController extends GetxController {
     reports.refresh();
     await LocalStorageService.saveReports(reports.toList());
 
-    // Local-only path: this report was never synced to the server, so
-    // there's nothing for the server to soft-delete. Removing it from
-    // local storage is the whole job.
-    final isLocalOnly = reportId.startsWith('report_') ||
-        snapshot['synced'] == false;
-    if (isLocalOnly) {
+    // Local-only path: ANY id that isn't a 24-char hex Mongo ObjectId is
+    // a local placeholder (report_<ts>, sessionId-style, etc.) and was
+    // never actually written to the server. Calling DELETE on those used
+    // to fail with Mongoose CastError (500) → rollback → card reappeared.
+    final isMongoId = RegExp(r'^[0-9a-fA-F]{24}$').hasMatch(reportId);
+    if (!isMongoId || snapshot['synced'] == false) {
       return snapshot;
     }
 
-    final ok = await ApiService.deleteReport(reportId);
+    bool ok;
+    try {
+      ok = await ApiService.deleteReport(reportId);
+    } on UnauthorizedException {
+      // Token expired — restore locally so the worker sees the report
+      // again, then let the auth flow drive them to re-login.
+      reports.insert(idx.clamp(0, reports.length), snapshot);
+      reports.refresh();
+      await LocalStorageService.saveReports(reports.toList());
+      rethrow;
+    }
     if (!ok) {
       // Roll back — restore at the original index so the UI matches reality.
       reports.insert(idx.clamp(0, reports.length), snapshot);
@@ -571,9 +581,8 @@ class PatientController extends GetxController {
       await LocalStorageService.saveReports(reports.toList());
     }
 
-    final isLocalOnly = reportId.startsWith('report_') ||
-        snapshot['synced'] == false;
-    if (isLocalOnly) {
+    final isMongoId = RegExp(r'^[0-9a-fA-F]{24}$').hasMatch(reportId);
+    if (!isMongoId || snapshot['synced'] == false) {
       return true;
     }
 

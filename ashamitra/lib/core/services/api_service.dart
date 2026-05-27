@@ -333,10 +333,18 @@ class ApiService {
         headers: _headers,
       ).timeout(const Duration(seconds: 30));
       _guard(res.statusCode);
-      if (res.statusCode != 200) return false;
+      if (res.statusCode != 200) {
+        // ignore: avoid_print
+        print('[deleteReport] HTTP ${res.statusCode}: ${res.body}');
+        return false;
+      }
       final body = jsonDecode(res.body) as Map<String, dynamic>;
       return body['success'] == true;
-    } catch (_) {
+    } on UnauthorizedException {
+      rethrow; // let the controller propagate to AuthController.forceLogout
+    } catch (e) {
+      // ignore: avoid_print
+      print('[deleteReport] error: $e');
       return false;
     }
   }
@@ -350,10 +358,18 @@ class ApiService {
         headers: _headers,
       ).timeout(const Duration(seconds: 30));
       _guard(res.statusCode);
-      if (res.statusCode != 200) return false;
+      if (res.statusCode != 200) {
+        // ignore: avoid_print
+        print('[restoreReport] HTTP ${res.statusCode}: ${res.body}');
+        return false;
+      }
       final body = jsonDecode(res.body) as Map<String, dynamic>;
       return body['success'] == true;
-    } catch (_) {
+    } on UnauthorizedException {
+      rethrow;
+    } catch (e) {
+      // ignore: avoid_print
+      print('[restoreReport] error: $e');
       return false;
     }
   }
