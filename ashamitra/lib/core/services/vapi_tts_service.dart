@@ -17,7 +17,14 @@ import '../constants/api_constants.dart';
 class VapiTtsService {
   static final VapiTtsService _instance = VapiTtsService._();
   factory VapiTtsService() => _instance;
-  VapiTtsService._();
+  VapiTtsService._() {
+    // Wire onPlayerComplete EXACTLY ONCE — previous code added a listener
+    // per speak() call, leaking N subscriptions over a session of N turns.
+    // Each leaked listener would fire onComplete on every later playback,
+    // causing the screen to try restarting STT N times in parallel, which
+    // raced into a "stuck mic" state where the worker couldn't speak.
+    _player.onPlayerComplete.listen((_) => onComplete?.call());
+  }
 
   final _player = AudioPlayer();
   static const _cacheLimit = 60 * 1024 * 1024; // 60 MB max cache
@@ -94,9 +101,10 @@ class VapiTtsService {
         }
       }
 
-      // Play the cached MP3
+      // Play the cached MP3. Completion listener wired once in the
+      // constructor; calling .listen here again would leak a subscription
+      // per speak() call (see constructor comment).
       onStart?.call();
-      _player.onPlayerComplete.listen((_) => onComplete?.call());
       await _player.play(DeviceFileSource(file.path));
       return true;
     } catch (_) {
@@ -126,7 +134,7 @@ class VapiTtsService {
         await _evictIfNeeded(dir);
       }
       onStart?.call();
-      _player.onPlayerComplete.listen((_) => onComplete?.call());
+      // Completion listener wired once in the constructor — see speak().
       await _player.play(DeviceFileSource(file.path));
       return true;
     } catch (_) {
