@@ -16,9 +16,11 @@
 //     instant + free).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../../core/constants/api_constants.dart';
+import '../../../core/services/ai_response_cache.dart';
 import '../../../core/services/api_service.dart';
 
 enum AssistantLang { bn, hi, en }
@@ -109,19 +111,29 @@ class AssistantChatService {
       appLanguage: appLanguage,
     );
 
-    // Combined /chat-with-voice — one round-trip for text + MP3 instead
-    // of the legacy two-call pattern. voiceField='spoken_text' tells the
-    // server to pull only that sub-field from the LLM's structured JSON
-    // for synthesis (so the user doesn't hear "is_clinical: true" etc).
+    // On-device cache check first — same normalized prompt has been
+    // answered before → instant reply, zero network, works offline.
+    // Same disk store as the triage flow (AiResponseCache), so any
+    // prompt either path warms also helps the other.
+    final cache = AiResponseCache();
+    final cached = await cache.get(prompt);
     Map<String, dynamic>? body;
-    try {
-      body = await ApiService.chatWithVoice(
-        prompt: prompt,
-        voiceField: 'spoken_text',
-        tone: 'normal',
-        timeout: const Duration(seconds: 25),
-      );
-    } catch (_) { /* fall through to offline */ }
+    if (cached != null) {
+      body = cached;
+    } else {
+      // Combined /chat-with-voice — one round-trip for text + MP3 instead
+      // of the legacy two-call pattern. voiceField='spoken_text' tells the
+      // server to pull only that sub-field from the LLM's structured JSON
+      // for synthesis (so the user doesn't hear "is_clinical: true" etc).
+      try {
+        body = await ApiService.chatWithVoice(
+          prompt: prompt,
+          voiceField: 'spoken_text',
+          tone: 'normal',
+          timeout: const Duration(seconds: 25),
+        );
+      } catch (_) { /* fall through to offline */ }
+    }
 
     // Fall back to legacy /api/chat if combined endpoint failed (e.g.
     // older server before the route landed, or transient 503).
@@ -142,6 +154,18 @@ class AssistantChatService {
         return _offlineFallback(userInput, appLanguage);
       }
       body = jsonDecode(res.body) as Map<String, dynamic>;
+    }
+
+    // Cache for offline reuse — strip the audio bytes (MP3s are cached
+    // separately by VapiTtsService at the MP3 layer, and writing them
+    // here would bloat the JSON cache fast). Fire-and-forget so the
+    // user-facing latency isn't tied to disk write.
+    if (cached == null && (body['text'] as String? ?? '').isNotEmpty) {
+      final cachePayload = Map<String, dynamic>.from(body)
+        ..remove('audio')
+        ..remove('audioMime')
+        ..remove('audioTone');
+      unawaited(cache.put(prompt, cachePayload));
     }
 
     final raw = (body['text'] as String? ?? '')
