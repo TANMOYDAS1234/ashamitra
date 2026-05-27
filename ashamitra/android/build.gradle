@@ -1,7 +1,71 @@
 allprojects {
     repositories {
+        // FIRST: project-local Maven repo with 7 JARs that Gradle's
+        // variant-aware artifact-transform step can't resolve from the
+        // global cache while offline (cached metadata index missing
+        // variant info, SSL inspection blocks the network refresh that
+        // would rebuild it). Using POM-only metadata sources forces
+        // Gradle to skip Gradle Module Metadata variant matching — the
+        // POM + JAR pair is enough to satisfy the dexing transforms.
+        maven {
+            url uri("$rootDir/local-maven")
+            metadataSources { mavenPom(); artifact() }
+            content {
+                includeModule("androidx.datastore", "datastore-preferences-external-protobuf")
+                includeModule("androidx.datastore", "datastore-preferences-proto")
+                includeModule("androidx.resourceinspection", "resourceinspection-annotation")
+                includeModule("androidx.collection", "collection-ktx")
+                includeModule("androidx.concurrent", "concurrent-futures")
+                includeModuleByRegex("org\\.jetbrains\\.kotlin", "kotlin-parcelize-runtime")
+                includeModuleByRegex("org\\.jetbrains\\.kotlin", "kotlin-android-extensions-runtime")
+            }
+        }
+
+        // Aliyun mirrors first — they serve the same artifacts as
+        // Maven Central + Google but use a different SSL certificate
+        // chain. On Windows machines where antivirus / proxy SSL
+        // inspection (Kaspersky, ESET, ZScaler etc.) breaks Java's
+        // trust of Maven Central, Aliyun usually still resolves.
+        // They're also geographically closer to India than US-hosted
+        // mirrors, so first-time downloads are noticeably faster.
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
         google()
         mavenCentral()
+    }
+
+    // Force every Kotlin library to resolve to 2.1.x (already cached).
+    // Paired with the plugin pin in settings.gradle, this prevents Gradle
+    // from trying to download any 2.3.0 jars that the SSL block would
+    // prevent us from fetching anyway.
+    //
+    // Also forces androidx.browser:browser to the 1.8.0 already in cache
+    // (url_launcher_android 6.3.30 wants 1.9.0 which the SSL block can't
+    // fetch). 1.8.0 is API-compatible — no app code needs 1.9.0 features.
+    configurations.all {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'org.jetbrains.kotlin') {
+                // These small runtime jars are only cached at 1.9.22 — they
+                // are ABI-stable across minor Kotlin versions so safe to mix
+                // with 2.1.0 stdlib. Everything else snaps to 2.1.0 which is
+                // the most-complete cached Kotlin family.
+                def legacyRuntime = [
+                    'kotlin-parcelize-runtime',
+                    'kotlin-android-extensions-runtime',
+                ]
+                if (legacyRuntime.contains(details.requested.name)) {
+                    details.useVersion '1.9.22'
+                } else {
+                    details.useVersion '2.1.0'
+                }
+            }
+            if (details.requested.group == 'androidx.browser' &&
+                details.requested.name == 'browser') {
+                details.useVersion '1.8.0'
+            }
+        }
+
     }
 }
 

@@ -10,9 +10,33 @@ pluginManagement {
     includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
     repositories {
+        // Aliyun mirrors first — see comment in android/build.gradle.
+        // Workaround for Windows SSL-inspection PKIX failures on
+        // Maven Central; also faster from India.
+        // NOTE: plugin resolution needs Gradle Module Metadata (.module
+        // files describe plugin markers), so we keep default metadata
+        // sources here. The POM-only restriction is applied only to
+        // PROJECT repositories in android/build.gradle.
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
         google()
         mavenCentral()
         gradlePluginPortal()
+    }
+
+    // Force every Kotlin plugin request to resolve to 2.1.0, the version
+    // already cached locally. Some Flutter plugins (notably
+    // shared_preferences_android v2.4+) transitively pull Kotlin 2.3.0,
+    // and on Windows machines where SSL inspection (Kaspersky / ESET /
+    // ZScaler) breaks Maven Central trust, those new artifacts can't be
+    // downloaded. Pinning here avoids the download entirely.
+    resolutionStrategy {
+        eachPlugin {
+            if (requested.id.namespace?.startsWith('org.jetbrains.kotlin')) {
+                useVersion('2.1.0')
+            }
+        }
     }
 }
 

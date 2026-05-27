@@ -33,6 +33,23 @@ dependencies:
   google_fonts: ^6.2.1
   shimmer: ^3.0.0
 
+dependency_overrides:
+  # Several Flutter plugins bumped their own buildscript Kotlin version
+  # to 2.3.0 in their latest patch releases:
+  #   - shared_preferences_android 2.4.23+
+  #   - url_launcher_android         6.3.30+
+  #   - webview_flutter_android      4.10.15+
+  # On Windows machines where antivirus / proxy SSL inspection
+  # (Kaspersky, ESET, ZScaler, etc.) breaks Java's trust of Maven
+  # Central with PKIX errors, those new Kotlin downloads fail.
+  # Pinning each to the last version that uses Kotlin 2.2.x — all
+  # already cached locally — keeps the build offline-clean.
+  # Bump these once SSL inspection is fixed AND the Kotlin 2.3 jars
+  # are confirmed downloadable.
+  shared_preferences_android: 2.4.13
+  url_launcher_android: 6.3.29
+  webview_flutter_android: 4.10.14
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

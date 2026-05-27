@@ -39,6 +39,7 @@ ashamitra/devtools_options.yaml
 
 # ── Android build ────────────────────────────────────────────────────────
 **/.gradle/
+**/.kotlin/
 ashamitra/android/captures/
 ashamitra/android/local.properties
 ashamitra/android/key.properties
