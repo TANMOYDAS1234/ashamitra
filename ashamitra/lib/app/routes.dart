@@ -22,6 +22,7 @@ import '../features/admin/presentation/screens/admin_asha_list_screen.dart';
 import '../features/admin/presentation/screens/admin_add_asha_screen.dart';
 import '../features/admin/presentation/screens/admin_reports_screen.dart';
 import '../features/admin/presentation/screens/admin_profile_screen.dart';
+import '../features/assistant/presentation/screens/assistant_screen.dart';
 
 /// Route-typed transition vocabulary.
 ///
@@ -48,6 +49,7 @@ class AppRoutes {
   static const emergency       = '/emergency';
   static const reports         = '/reports';
   static const profile         = '/profile';
+  static const assistant       = '/assistant';
   // Admin
   static const adminDashboard  = '/admin';
   static const adminAshaList   = '/admin/asha';
@@ -124,6 +126,16 @@ class AppRoutes {
       page: () => const ProfileScreen(),
       transition: Transition.fadeIn,
       transitionDuration: _fast,
+    ),
+
+    // AI Assistant — Gemini-Live-style voice-first chat. zoom transition
+    // reinforces "you are entering a conversation".
+    GetPage(
+      name: assistant,
+      page: () => const AssistantScreen(),
+      transition: Transition.zoom,
+      transitionDuration: Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
     ),
 
     // Triage entry — zoom (mic-centric, "enter the conversation")

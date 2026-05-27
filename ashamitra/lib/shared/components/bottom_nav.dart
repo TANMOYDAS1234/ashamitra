@@ -36,7 +36,7 @@ class BottomNav extends StatelessWidget {
                 selected: currentIndex == 1,
                 onTap: () => Get.offAllNamed(AppRoutes.patientList),
               ),
-              _VoiceNavItem(onTap: () => Get.toNamed(AppRoutes.selectCase)),
+              _VoiceNavItem(onTap: () => Get.toNamed(AppRoutes.assistant)),
               _NavItem(
                 icon: Icons.bar_chart_rounded,
                 label: 'reports'.tr,

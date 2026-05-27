@@ -3,11 +3,9 @@ import 'package:get/get.dart';
 import '../../../../app/routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_gradients.dart';
-import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/services/case_detection_service.dart';
 import '../../../../shared/components/bottom_nav.dart';
-import '../../../../shared/widgets/voice_orb.dart';
 import '../widgets/greeting_header.dart';
 import '../widgets/dashboard_card.dart';
 import '../widgets/patient_context_sheet.dart';
@@ -85,8 +83,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                   child: Column(
                     children: [
-                      _VoiceCallToAction(onTap: () => Get.toNamed(AppRoutes.selectCase)),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 4),
                       Align(
                         alignment: Alignment.centerLeft,
                         child: Row(
@@ -142,43 +139,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       bottomNavigationBar: const BottomNav(currentIndex: 0),
-    );
-  }
-}
-
-class _VoiceCallToAction extends StatelessWidget {
-  final VoidCallback onTap;
-  const _VoiceCallToAction({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: AppRadius.xlR,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppRadius.xlR,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Column(
-            children: [
-              const VoiceOrb(size: 110),
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.10),
-                  borderRadius: AppRadius.pillR,
-                ),
-                child: Text(
-                  'tap_to_start'.tr,
-                  style: AppTextStyles.label.copyWith(color: AppColors.primary),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
