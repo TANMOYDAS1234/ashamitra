@@ -205,7 +205,14 @@ class ApiService {
 
   // ── Reports ────────────────────────────────────────────────────────────────
 
-  static Future<bool> saveReport(Map<String, dynamic> report) async {
+  /// Returns the server-created report doc (with the real Mongo `_id` mapped
+  /// to `id`) on success, null on failure. Callers should swap the local
+  /// placeholder id with `result['id']` so future deletes / patches hit the
+  /// correct server record — without this swap, a locally-created report
+  /// stays addressable by its `report_<ts>` placeholder forever, and the
+  /// soft-delete path silently no-ops (server keeps the row, next sync
+  /// brings it back).
+  static Future<Map<String, dynamic>?> saveReport(Map<String, dynamic> report) async {
     try {
       final res = await http.post(
         Uri.parse('$baseUrl/reports'),
@@ -214,9 +221,14 @@ class ApiService {
       ).timeout(const Duration(seconds: 45));
       _guard(res.statusCode);
       final body = jsonDecode(res.body) as Map<String, dynamic>;
-      return body['success'] == true;
-    } catch (_) {
-      return false;
+      if (body['success'] != true) return null;
+      return body['data'] as Map<String, dynamic>?;
+    } on UnauthorizedException {
+      rethrow;
+    } catch (e) {
+      // ignore: avoid_print
+      print('[saveReport] error: $e');
+      return null;
     }
   }
 

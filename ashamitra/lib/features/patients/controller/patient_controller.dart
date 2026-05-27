@@ -459,16 +459,26 @@ class PatientController extends GetxController {
   /// so [syncFromServer] does not upload it again. On failure it stays
   /// pending and is retried on the next sync.
   Future<void> _uploadReport(Map<String, dynamic> report) async {
+    final localId = report['id']?.toString() ?? '';
     final data = Map<String, dynamic>.from(report)
       ..remove('id')
       ..remove('synced');
-    final ok = await ApiService.saveReport(data);
-    if (!ok) return;
-    final idx = reports.indexWhere((r) => r['id'] == report['id']);
-    if (idx != -1) {
-      reports[idx] = {...reports[idx], 'synced': true};
-      LocalStorageService.saveReports(reports.toList());
-    }
+    final saved = await ApiService.saveReport(data);
+    if (saved == null) return;
+    final idx = reports.indexWhere((r) => r['id'] == localId);
+    if (idx == -1) return;
+    // Swap the local placeholder id (report_<ts>) with the server's real
+    // Mongo _id so future delete / restore / attach-patient calls hit the
+    // correct server record. Without this swap, the synced report sat in
+    // local storage with the placeholder id forever, and deletes silently
+    // no-op'd server-side — next sync brought the "deleted" report back.
+    final serverId = saved['id']?.toString() ?? localId;
+    reports[idx] = {
+      ...reports[idx],
+      'id': serverId,
+      'synced': true,
+    };
+    LocalStorageService.saveReports(reports.toList());
   }
 
   /// Attaches an existing (typically anonymous) report to a patient. Used
