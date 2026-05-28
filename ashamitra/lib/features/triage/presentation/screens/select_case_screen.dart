@@ -10,6 +10,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/services/case_detection_service.dart';
 import '../../../../core/services/tts_service.dart';
 import '../../../../shared/components/app_header.dart';
+import '../../../home/presentation/widgets/patient_context_sheet.dart';
 import '../../data/models/triage_case_model.dart';
 
 class SelectCaseScreen extends StatefulWidget {
@@ -131,13 +132,43 @@ class _SelectCaseScreenState extends State<SelectCaseScreen> {
     });
   }
 
+  /// Visual metadata for each case id — shared between the tile grid in
+  /// build() and the PatientContextSheet handoff in _selectCase.
+  static const _caseVisuals = <String, (IconData, Color)>{
+    'pregnancy':   (Icons.pregnant_woman_rounded,        AppColors.primary),
+    'postpartum':  (Icons.health_and_safety_rounded,     AppColors.purple),
+    'newborn':     (Icons.child_care_rounded,            AppColors.sky),
+    'infant':      (Icons.baby_changing_station_rounded, AppColors.safeGreen),
+    'child':       (Icons.child_friendly_rounded,        AppColors.warningYellow),
+    'immunization':(Icons.vaccines_rounded,              AppColors.primary),
+    'emergency':   (Icons.emergency_rounded,             AppColors.emergencyRed),
+  };
+
   void _selectCase(TriageCaseModel caseModel) {
-    Get.toNamed(AppRoutes.voiceTriage, arguments: {
-      'caseId': caseModel.id,
-      'caseTitle': caseModel.title,
-      if (_patientId != null) 'patientId': _patientId,
-      if (_patientName != null) 'patientName': _patientName,
-    });
+    // If the caller already attached a patient (started from patient
+    // profile, add-patient form, etc.) skip the picker and go straight
+    // to triage. If not — e.g. the worker arrived here from the assistant
+    // tab's "save as case" flow — show the patient context sheet first
+    // so the resulting report gets attributed properly rather than being
+    // anonymous and needing "Attach Patient" later.
+    if (_patientId != null && _patientId!.isNotEmpty) {
+      Get.toNamed(AppRoutes.voiceTriage, arguments: {
+        'caseId': caseModel.id,
+        'caseTitle': caseModel.title,
+        'patientId': _patientId,
+        if (_patientName != null) 'patientName': _patientName,
+      });
+      return;
+    }
+    final (icon, color) = _caseVisuals[caseModel.id]
+        ?? (Icons.help_outline, AppColors.primary);
+    PatientContextSheet.show(
+      context,
+      caseId: caseModel.id,
+      caseTitle: caseModel.title,
+      caseIcon: icon,
+      caseColor: color,
+    );
   }
 
   @override
@@ -155,15 +186,7 @@ class _SelectCaseScreenState extends State<SelectCaseScreen> {
       );
     }
 
-    final caseIcons = {
-      'pregnancy': (Icons.pregnant_woman_rounded, AppColors.primary),
-      'postpartum': (Icons.health_and_safety_rounded, AppColors.purple),
-      'newborn': (Icons.child_care_rounded, AppColors.sky),
-      'infant': (Icons.baby_changing_station_rounded, AppColors.safeGreen),
-      'child': (Icons.child_friendly_rounded, AppColors.warningYellow),
-      'immunization': (Icons.vaccines_rounded, AppColors.primary),
-      'emergency': (Icons.emergency_rounded, AppColors.emergencyRed),
-    };
+    final caseIcons = _caseVisuals;
 
     return Scaffold(
       body: Container(
