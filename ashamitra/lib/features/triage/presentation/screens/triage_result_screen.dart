@@ -34,6 +34,12 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
   late final List<({String question, String answer})> _qaPairs;
   bool _reportSaved = false;
 
+  /// Set after the worker uses the inline "Add Patient" picker on this
+  /// screen (urgent / anonymous triage only). Drives the post-attach UI
+  /// (button replaced by a small confirmation pill) so the worker sees
+  /// the action took effect without leaving the screen.
+  String? _attachedPatientName;
+
   @override
   void initState() {
     super.initState();
@@ -335,6 +341,23 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                 // ── Action card (all bands) ──────────────────────────────────
                 _ActionCard(engineResult: _engineResult, outcome: _outcome),
 
+                // ── Attach Patient CTA (anonymous / urgent triage) ──────────
+                // Shown when no patient was picked at start. The subtitle on
+                // home's "অনামী ট্রায়াজ" option promises this — now the
+                // worker can act on it right here, instead of hunting for
+                // the Attach button buried in the Reports tab.
+                if (_attachedPatientName == null &&
+                    (_args['_patientName'] == null ||
+                     _args['_patientName'].toString().trim().isEmpty)) ...[
+                  const SizedBox(height: 16),
+                  _AttachPatientCard(
+                    onTap: () => _openAttachPatientPicker(context),
+                  ),
+                ] else if (_attachedPatientName != null) ...[
+                  const SizedBox(height: 16),
+                  _AttachedPatientPill(name: _attachedPatientName!),
+                ],
+
                 // ── Q&A summary ──────────────────────────────────────────────
                 if (_qaPairs.isNotEmpty) ...[
                   const SizedBox(height: 16),
@@ -397,6 +420,280 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Opens a searchable bottom sheet of the worker's existing patients
+  /// and attaches the picked one to the most recent report (the one
+  /// _autoSaveReport just created). Mirrors the Reports-tab attach flow
+  /// so behaviour stays consistent.
+  Future<void> _openAttachPatientPicker(BuildContext context) async {
+    final ctrl = Get.find<PatientController>();
+    final patients = ctrl.patients.toList();
+    if (patients.isEmpty) {
+      Get.snackbar(
+        'কোনো রোগী নেই',
+        'প্রথমে রোগী যোগ করুন, তারপর এই রিপোর্টে যুক্ত করুন।',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppColors.warningYellow,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
+        duration: const Duration(seconds: 4),
+      );
+      return;
+    }
+    String query = '';
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (sbCtx, setSheetState) {
+          final q = query.toLowerCase().trim();
+          final filtered = q.isEmpty
+              ? patients
+              : patients.where((p) =>
+                  p.name.toLowerCase().contains(q) ||
+                  p.village.toLowerCase().contains(q) ||
+                  p.mobile.contains(q),
+                ).toList();
+          return SafeArea(
+            child: Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(sbCtx).size.height * 0.75,
+              ),
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40, height: 4,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('রোগী নির্বাচন করুন',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    onChanged: (v) => setSheetState(() => query = v),
+                    decoration: const InputDecoration(
+                      hintText: 'নাম, গ্রাম বা মোবাইল দিয়ে খুঁজুন',
+                      prefixIcon: Icon(Icons.search_rounded,
+                          color: AppColors.primary, size: 22),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: filtered.isEmpty
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 32),
+                              child: Text('কোনো ফলাফল পাওয়া যায়নি'),
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            itemCount: filtered.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 6),
+                            itemBuilder: (_, i) {
+                              final p = filtered[i];
+                              return Material(
+                                color: AppColors.primarySoft,
+                                borderRadius: AppRadius.lgR,
+                                child: InkWell(
+                                  borderRadius: AppRadius.lgR,
+                                  onTap: () async {
+                                    Navigator.of(sheetCtx).pop();
+                                    // The just-saved report sits at
+                                    // reports[0] (most recent first).
+                                    // Wait briefly for upload to swap the
+                                    // placeholder id with the server _id,
+                                    // so the PATCH targets the real doc.
+                                    final report = ctrl.reports.isNotEmpty
+                                        ? ctrl.reports[0]
+                                        : null;
+                                    final reportId =
+                                        report?['id']?.toString() ?? '';
+                                    if (reportId.isEmpty) return;
+                                    final ok = await ctrl.attachPatientToReport(
+                                      reportId:    reportId,
+                                      patientId:   p.id,
+                                      patientName: p.name,
+                                      patientType: p.type,
+                                    );
+                                    if (mounted) {
+                                      setState(() => _attachedPatientName = p.name);
+                                    }
+                                    Get.snackbar(
+                                      ok ? 'যুক্ত হয়েছে' : 'যুক্ত হয়েছে (অফলাইন)',
+                                      ok
+                                          ? '${p.name} এই রিপোর্টের সাথে যুক্ত করা হয়েছে।'
+                                          : '${p.name} স্থানীয়ভাবে যুক্ত — সার্ভারে পরে সিঙ্ক হবে।',
+                                      snackPosition: SnackPosition.BOTTOM,
+                                      backgroundColor: ok
+                                          ? AppColors.safeGreen
+                                          : AppColors.warningYellow,
+                                      colorText: Colors.white,
+                                      margin: const EdgeInsets.all(16),
+                                      borderRadius: 12,
+                                      duration: const Duration(seconds: 3),
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 12),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.person_rounded,
+                                            color: AppColors.primary, size: 20),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                p.name,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                              Text(
+                                                '${p.type} · ${p.village}',
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  color: AppColors.textSecondary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _AttachPatientCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _AttachPatientCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.primarySoft,
+      borderRadius: AppRadius.lgR,
+      child: InkWell(
+        borderRadius: AppRadius.lgR,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: AppRadius.lgR,
+            border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.3),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.person_add_alt_1_rounded,
+                    color: AppColors.primary, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'রোগী যুক্ত করুন',
+                      style: AppTextStyles.label.copyWith(
+                          color: AppColors.primary, fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'এই রিপোর্টটি এখনো কোনো রোগীর সাথে যুক্ত নয়।',
+                      style: AppTextStyles.bodySm.copyWith(
+                          color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded,
+                  color: AppColors.primary, size: 22),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AttachedPatientPill extends StatelessWidget {
+  final String name;
+  const _AttachedPatientPill({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.safeGreen.withValues(alpha: 0.10),
+        borderRadius: AppRadius.lgR,
+        border: Border.all(
+          color: AppColors.safeGreen.withValues(alpha: 0.35),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle_rounded,
+              color: AppColors.safeGreen, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '$name এই রিপোর্টের সাথে যুক্ত',
+              style: AppTextStyles.bodySm.copyWith(
+                color: AppColors.safeGreen,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
