@@ -116,8 +116,21 @@ class _AssistantScreenState extends State<AssistantScreen> {
     _tts.onComplete = () {
       if (!mounted) return;
       setState(() => _orbState = OrbState.idle);
-      // Auto-listen after every TTS chunk — voice-first behaviour
-      if (!_isThinking && !_showSaveChip) _startListening();
+      // Auto-listen after every TTS chunk — but wait for the audio to
+      // actually drain from the speaker first, so the next phrase the
+      // AI just spoke isn't captured by STT as the worker's next input.
+      if (!_isThinking && !_showSaveChip) {
+        () async {
+          final deadline = DateTime.now().add(const Duration(seconds: 2));
+          while (_tts.isPlaying && DateTime.now().isBefore(deadline)) {
+            await Future.delayed(const Duration(milliseconds: 80));
+          }
+          await Future.delayed(const Duration(milliseconds: 600));
+          if (mounted && !_isThinking && !_showSaveChip && !_isListening) {
+            _startListening();
+          }
+        }();
+      }
     };
     _tts.onError = () {
       if (mounted) _resetToIdle();
@@ -171,16 +184,21 @@ class _AssistantScreenState extends State<AssistantScreen> {
     final input = _liveTranscript.trim();
     if (input.isEmpty) {
       _statusLine = _idleStatus(_activeLang);
-      // Silent timeout (4s pauseFor or 30s listenFor with no speech) —
-      // re-arm the mic so the screen stays truly always-listening while
-      // open. Without this the worker would have to tap the orb after
-      // any silent pause. Tiny delay so STT releases cleanly first.
+      // Silent timeout (pauseFor or listenFor with no speech) — re-arm
+      // the mic so the screen stays truly always-listening while open.
+      // Gate on TTS-not-playing so the AI's own voice doesn't bleed into
+      // the next STT session (the "TTS taken as input" bug).
       if (_autoListen && !_isThinking && !_showSaveChip) {
-        Future.delayed(const Duration(milliseconds: 250), () {
+        () async {
+          final deadline = DateTime.now().add(const Duration(seconds: 2));
+          while (_tts.isPlaying && DateTime.now().isBefore(deadline)) {
+            await Future.delayed(const Duration(milliseconds: 80));
+          }
+          await Future.delayed(const Duration(milliseconds: 600));
           if (mounted && _autoListen && !_isListening && !_isThinking) {
             _startListening();
           }
-        });
+        }();
       }
       return;
     }

@@ -20,13 +20,28 @@ class VapiTtsService {
   VapiTtsService._() {
     // Wire onPlayerComplete EXACTLY ONCE — previous code added a listener
     // per speak() call, leaking N subscriptions over a session of N turns.
-    // Each leaked listener would fire onComplete on every later playback,
-    // causing the screen to try restarting STT N times in parallel, which
-    // raced into a "stuck mic" state where the worker couldn't speak.
-    _player.onPlayerComplete.listen((_) => onComplete?.call());
+    _player.onPlayerComplete.listen((_) {
+      _isPlaying = false;
+      onComplete?.call();
+    });
+    _player.onPlayerStateChanged.listen((state) {
+      // Mirror Android's actual playback state so STT-restart gates can
+      // see whether audio is still coming out of the speaker. Critical for
+      // preventing mic bleed-back where the AI's own voice gets captured
+      // by STT as if the worker said it.
+      _isPlaying = state == PlayerState.playing;
+    });
   }
 
   final _player = AudioPlayer();
+
+  /// True while the AudioPlayer is actively rendering audio. Callers that
+  /// open the mic right after a TTS turn (STT auto-restart) should wait
+  /// for this to be false plus a small settle window before listening —
+  /// otherwise the speaker output is captured back into STT as the next
+  /// "worker input", which feeds the LLM the AI's own previous sentence.
+  bool get isPlaying => _isPlaying;
+  bool _isPlaying = false;
   static const _cacheLimit = 60 * 1024 * 1024; // 60 MB max cache
   // Cache-key tag only — actual voice is chosen server-side.
   // Bump this string when switching voices so old cached MP3s are not replayed.

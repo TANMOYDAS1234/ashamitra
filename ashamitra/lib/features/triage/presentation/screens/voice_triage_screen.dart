@@ -163,10 +163,19 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
   Future<void> _autoRestartListening() async {
     if (!mounted) return;
     if (!_autoListen || _isProcessing || _isListening || !_sttAvailable) return;
-    // Tiny delay so the audio player fully releases the mic channel
-    // before STT grabs it — without this the first 200ms of speech
-    // can get clipped.
-    await Future.delayed(const Duration(milliseconds: 250));
+    // Wait for TTS audio to fully drain from the speaker before opening
+    // the mic. Without this gate, the AI's own voice leaks into STT and
+    // gets transcribed as the worker's "next input" — the LLM then
+    // replies to its own previous sentence (the "TTS taken as input"
+    // bug pilot users reported).
+    // 1. Poll for audio player to report not-playing (max 2 sec)
+    final deadline = DateTime.now().add(const Duration(seconds: 2));
+    while (_tts.isPlaying && DateTime.now().isBefore(deadline)) {
+      await Future.delayed(const Duration(milliseconds: 80));
+    }
+    // 2. Additional settle window so the Android audio channel fully
+    //    releases the mic from echo-suppression mode before STT opens.
+    await Future.delayed(const Duration(milliseconds: 600));
     if (!mounted || !_autoListen || _isProcessing || _isListening) return;
     await _toggleListening();
   }
@@ -402,10 +411,17 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
     }
     _lastOnlineQuestionId = null; // consume
 
+    // ── Phase 1: network call ───────────────────────────────────────────
+    // ONLY the network call is in this try block. Anything past it
+    // (history.add, TTS playback, closing summary) is post-success work
+    // and must NOT trigger the offline fallback — otherwise a TTS hiccup
+    // would add a second contradictory message to the conversation
+    // (the original cause of the "online + offline together" bug).
+    ConversationResponse response;
     try {
       final authToken = LocalStorageService.get('jwt_token');
       if (mounted) setState(() => _statusText = 'সংযোগ করছি...');
-      final response = await _conversationService.respond(
+      response = await _conversationService.respond(
         caseType: _caseType,
         moduleId: _moduleId,
         history: List.from(_history)..removeLast(),
@@ -418,64 +434,73 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
           if (mounted) setState(() => _streamingPartial = partial);
         },
       );
-
+    } catch (e) {
+      // Online path failed — server cold-start, AI quota (503), or weak
+      // signal. Fall back to the offline engine ONLY here (true network
+      // failure), not for any later TTS / UI errors.
       if (!mounted) return;
-      setState(() {
-        _streamingPartial = '';
-        _statusText = 'বিশ্লেষণ করছি...';
-      });
-
-      // Merge Gemini extractions (Gemini handles complex multi-symptom replies)
-      final toMerge = uncertain
-          ? Map.fromEntries(
-              response.extractedAnswers.entries.where((e) => e.value == false))
-          : response.extractedAnswers;
-      _extractedAnswers.addAll(toMerge);
-
-      // Track which question ID the prompt is about to tell Gemini to ask
-      // so next turn's bare yes/no can be recorded against it.
-      const priorityOrder = {
-        'pregnancy':    ['p1','p3','p6','p4','p2','p5'],
-        'delivery_pnc': ['pp1','pp2','pp4','pp6','pp3','pp5'],
-        'newborn':      ['n1','n2','n3','n5','n4','n6'],
-        'child':        ['c1','c5','c2','c3','c4','c6'],
-        'emergency':    ['e1','e2','e3','e4'],
-        'immunisation': ['im4','im2','im1','im5','im3'],
-      };
-      final order = priorityOrder[_moduleId] ?? <String>[];
-      _lastOnlineQuestionId = order
-          .cast<String?>()
-          .firstWhere((id) => !_extractedAnswers.containsKey(id),
-              orElse: () => null);
-
-      _extractedVitals.addAll(response.extractedVitals);
-      // Live risk band — the SAME RuleExecutor that TriageResultScreen runs,
-      // so the badge always matches the final result. Gemini's risk_level is
-      // intentionally not used here (the result screen does not use it either).
-      _riskLevel = _computeLocalRiskLevel();
-      // Add assistant turn to history
-      _history.add(ConversationTurn(
-          role: 'assistant', text: response.spokenResponse));
-
-      // Response landed — kill the cold-start hint timer.
       _coldStartHintTimer?.cancel();
+      _turnCount--; // do not burn a wasted turn
       setState(() {
         _isProcessing = false;
         _orbState = OrbState.idle;
-        _statusText = 'মাইক ট্যাপ করুন কথা বলতে';
-        _transcript = '';
+        _streamingPartial = '';
       });
+      await _processOffline(input, uncertain: uncertain);
+      return;
+    }
 
-      // Speak the response. If the combined /chat-with-voice endpoint
-      // pre-synthesized the MP3, play those bytes directly — no second
-      // network round-trip. Otherwise fall back to the standard cache-
-      // then-network path.
-      if (response.prefetchedAudio != null && response.prefetchedAudio!.isNotEmpty) {
-        // tone matches the server's default ('normal') for chat-with-voice;
-        // _speakNatural would have used the risk-derived tone, but the
-        // round-trip savings dominate the perceptual difference of a
-        // slightly different speaking rate. The bytes are cached under the
-        // 'normal' tone key — consistent with how the server synthesized them.
+    // ── Phase 2: process the successful response ────────────────────────
+    // Errors below this point (TTS playback, navigation, etc.) are NOT
+    // caught here — they should bubble up and surface as their own
+    // errors rather than silently dual-firing the offline engine.
+    if (!mounted) return;
+    setState(() {
+      _streamingPartial = '';
+      _statusText = 'বিশ্লেষণ করছি...';
+    });
+
+    // Merge Gemini extractions (Gemini handles complex multi-symptom replies)
+    final toMerge = uncertain
+        ? Map.fromEntries(
+            response.extractedAnswers.entries.where((e) => e.value == false))
+        : response.extractedAnswers;
+    _extractedAnswers.addAll(toMerge);
+
+    // Track which question ID the prompt is about to tell Gemini to ask
+    // so next turn's bare yes/no can be recorded against it.
+    const priorityOrder = {
+      'pregnancy':    ['p1','p3','p6','p4','p2','p5'],
+      'delivery_pnc': ['pp1','pp2','pp4','pp6','pp3','pp5'],
+      'newborn':      ['n1','n2','n3','n5','n4','n6'],
+      'child':        ['c1','c5','c2','c3','c4','c6'],
+      'emergency':    ['e1','e2','e3','e4'],
+      'immunisation': ['im4','im2','im1','im5','im3'],
+    };
+    final order = priorityOrder[_moduleId] ?? <String>[];
+    _lastOnlineQuestionId = order
+        .cast<String?>()
+        .firstWhere((id) => !_extractedAnswers.containsKey(id),
+            orElse: () => null);
+
+    _extractedVitals.addAll(response.extractedVitals);
+    _riskLevel = _computeLocalRiskLevel();
+    _history.add(ConversationTurn(
+        role: 'assistant', text: response.spokenResponse));
+
+    _coldStartHintTimer?.cancel();
+    setState(() {
+      _isProcessing = false;
+      _orbState = OrbState.idle;
+      _statusText = 'মাইক ট্যাপ করুন কথা বলতে';
+      _transcript = '';
+    });
+
+    // Speak the response. Wrapped in its own try so a TTS failure can't
+    // accidentally trigger the offline fallback above.
+    try {
+      if (response.prefetchedAudio != null &&
+          response.prefetchedAudio!.isNotEmpty) {
         await _tts.speakBytes(
           response.prefetchedAudio!,
           text: response.spokenResponse,
@@ -484,41 +509,20 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
       } else {
         await _speakNatural(response.spokenResponse);
       }
+    } catch (_) { /* TTS failed — text already shown */ }
 
-      if (!mounted) return;
+    if (!mounted) return;
 
-      // ── No-situation exit ──────────────────────────────────────────────
-      // LLM judged this isn't a real triage (worker was just chatting /
-      // testing / has no patient). The farewell has already been spoken
-      // above; pop back to home WITHOUT writing a report.
-      if (response.cancelSession) {
-        _tts.stop();
-        _stt.stop();
-        Get.back();
-        return;
-      }
+    if (response.cancelSession) {
+      _tts.stop();
+      _stt.stop();
+      Get.back();
+      return;
+    }
 
-      // Finish if Gemini says so or max turns reached
-      if (response.shouldFinish || _turnCount >= _kMaxTurns) {
-        await _speakClosingSummary();
-        if (mounted) _submitAnswers();
-      }
-    } catch (e) {
-      // Online path failed — server cold-start, AI quota (503), or a weak
-      // signal. Fall back to the offline engine instead of dead-ending on a
-      // "network issue" the worker cannot get past.
-      if (!mounted) return;
-      _coldStartHintTimer?.cancel();
-      // Bug 1: reset _isProcessing so mic is not permanently blocked.
-      // Bug 2: undo turn increment so offline does not burn a wasted turn.
-      // Bug 3: do not set _isOffline permanently; _hasInternet() resets it.
-      _turnCount--;
-      setState(() {
-        _isProcessing = false;
-        _orbState = OrbState.idle;
-        _streamingPartial = '';
-      });
-      await _processOffline(input, uncertain: uncertain);
+    if (response.shouldFinish || _turnCount >= _kMaxTurns) {
+      await _speakClosingSummary();
+      if (mounted) _submitAnswers();
     }
   }
 

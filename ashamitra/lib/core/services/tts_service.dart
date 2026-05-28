@@ -124,4 +124,10 @@ class TtsService {
       };
 
   Future<void> stop() => _vapiTts.stop();
+
+  /// True while the underlying AudioPlayer is actively rendering audio.
+  /// Use this to gate STT auto-restart — opening the mic while TTS is
+  /// still coming out of the speaker causes the AI's own voice to be
+  /// captured as "worker input" (a feedback loop).
+  bool get isPlaying => _vapiTts.isPlaying;
 }
