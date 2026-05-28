@@ -273,14 +273,15 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
       cancelOnError: false,
     );
 
-    // pauseFor reduced from 7s → 3s for snappier turn-taking. Rural
-    // workers still speak slowly, but partialResults stream keeps the
-    // recognizer alive between words; 3s of true silence is plenty to
-    // signal "I'm done speaking" without making the worker feel rushed.
+    // pauseFor 5s — pilot feedback that 3s cut workers off mid-thought
+    // when they paused to recall a number or check a register. 5s of
+    // true silence is the sweet spot: workers don't feel rushed, but
+    // the recognizer still commits before the worker forgets they
+    // were speaking. partialResults stream keeps it alive between words.
     await _stt.listen(
       localeId: 'bn_IN',
       listenFor: const Duration(seconds: 60),
-      pauseFor: const Duration(seconds: 3),
+      pauseFor: const Duration(seconds: 5),
       listenOptions: opts,
       onResult: _onSpeechResult,
       onSoundLevelChange: (level) {
@@ -295,7 +296,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
       _sttFallback.listen(
         localeId: 'hi_IN',
         listenFor: const Duration(seconds: 60),
-        pauseFor: const Duration(seconds: 3),
+        pauseFor: const Duration(seconds: 5),
         listenOptions: opts,
         onResult: _onSpeechResult,
       );

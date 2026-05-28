@@ -140,10 +140,14 @@ class _AssistantScreenState extends State<AssistantScreen> {
       _orbState = OrbState.listening;
       _statusLine = _listeningStatus(_activeLang);
     });
+    // listenFor extended 30s → 45s and pauseFor 4s → 6s so ASHA workers
+    // get more thinking-time between phrases. They often pause mid-
+    // sentence to recall a number or look up a register; 4 sec was
+    // committing too early and cutting them off.
     await _stt.listen(
       localeId: _activeLang.sttLocale,
-      listenFor: const Duration(seconds: 30),
-      pauseFor: const Duration(seconds: 4),
+      listenFor: const Duration(seconds: 45),
+      pauseFor: const Duration(seconds: 6),
       listenOptions: SpeechListenOptions(
         listenMode: ListenMode.dictation,
         partialResults: true,
