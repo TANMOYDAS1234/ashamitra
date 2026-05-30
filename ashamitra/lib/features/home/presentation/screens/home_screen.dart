@@ -59,13 +59,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     // Emoji removed from titles — the Material icon already conveys the case.
     final cards = [
-      (Icons.pregnant_woman_rounded,         'গর্ভবতী চেকআপ',          'গর্ভাবস্থার যত্ন',   AppColors.primary,         'pregnancy'),
-      (Icons.child_care_rounded,             'প্রসব-পরবর্তী',           'ডেলিভারির পর যত্ন',  AppColors.purple,          'postpartum'),
-      (Icons.baby_changing_station_rounded,  'নবজাতক (০–২৮ দিন)',      'নবজাতকের যত্ন',     AppColors.sky,             'newborn'),
-      (Icons.child_friendly_rounded,         'শিশু (১–১২ মাস)',         'শিশুর স্বাস্থ্য',    const Color(0xFF10B981),   'infant'),
-      (Icons.face_rounded,                   'শিশু (১–৫ বছর)',          'শিশু স্বাস্থ্য যাচাই',const Color(0xFFF59E0B),  'child'),
-      (Icons.vaccines_rounded,               'টিকা / ইমিউনাইজেশন',    'টিকা মিস যাচাই',     const Color(0xFF6366F1),   'immunization'),
-      (Icons.emergency_rounded,              'জরুরি অবস্থা',           'জরুরি সাহায্য',     AppColors.emergencyRed,    'emergency'),
+      (Icons.pregnant_woman_rounded,         'case_pregnancy_title'.tr,          'case_pregnancy_sub'.tr,   AppColors.primary,         'pregnancy'),
+      (Icons.child_care_rounded,             'case_postpartum_title'.tr,           'case_postpartum_sub'.tr,  AppColors.purple,          'postpartum'),
+      (Icons.baby_changing_station_rounded,  'case_newborn_title'.tr,      'case_newborn_sub'.tr,     AppColors.sky,             'newborn'),
+      (Icons.child_friendly_rounded,         'case_infant_title'.tr,         'case_infant_sub'.tr,    const Color(0xFF10B981),   'infant'),
+      (Icons.face_rounded,                   'case_child_title'.tr,          'case_child_sub'.tr,const Color(0xFFF59E0B),  'child'),
+      (Icons.vaccines_rounded,               'case_immunisation_title'.tr,    'case_immunisation_sub'.tr,     const Color(0xFF6366F1),   'immunization'),
+      (Icons.emergency_rounded,              'case_emergency_title'.tr,           'case_emergency_sub'.tr,     AppColors.emergencyRed,    'emergency'),
     ];
 
     final width = MediaQuery.of(context).size.width;

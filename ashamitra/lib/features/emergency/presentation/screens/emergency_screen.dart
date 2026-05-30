@@ -34,7 +34,7 @@ class EmergencyScreen extends StatelessWidget {
   // ── Capture and share the patient's GPS so the ambulance can find them ────
   Future<void> _sharePatientLocation() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
-      Get.snackbar('লোকেশন বন্ধ', 'ফোনের GPS / লোকেশন চালু করুন',
+      Get.snackbar('location_off'.tr, 'location_off_msg'.tr,
           snackPosition: SnackPosition.BOTTOM);
       return;
     }
@@ -44,7 +44,7 @@ class EmergencyScreen extends StatelessWidget {
     }
     if (perm == LocationPermission.denied ||
         perm == LocationPermission.deniedForever) {
-      Get.snackbar('অনুমতি দরকার', 'অ্যাপকে লোকেশন অনুমতি দিন',
+      Get.snackbar('permission_needed'.tr, 'permission_needed_msg'.tr,
           snackPosition: SnackPosition.BOTTOM);
       return;
     }
@@ -59,7 +59,7 @@ class EmergencyScreen extends StatelessWidget {
       Get.dialog(_locationDialog(pos.latitude, pos.longitude));
     } catch (_) {
       if (Get.isDialogOpen ?? false) Get.back();
-      Get.snackbar('ব্যর্থ', 'অবস্থান পাওয়া যায়নি — আবার চেষ্টা করুন',
+      Get.snackbar('failed'.tr, 'location_not_found'.tr,
           snackPosition: SnackPosition.BOTTOM);
     }
   }
@@ -69,13 +69,13 @@ class EmergencyScreen extends StatelessWidget {
     final shareLink = 'https://maps.google.com/?q=$lat,$lng';
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: AppRadius.lgR),
-      title: Text('রোগীর অবস্থান', style: AppTextStyles.h2),
+      title: Text('patient_location'.tr, style: AppTextStyles.h2),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'এই অবস্থান অ্যাম্বুলেন্স বা সুপারভাইজারকে পাঠান:',
+            'send_location_msg'.tr,
             style: AppTextStyles.bodySm,
           ),
           const SizedBox(height: 10),
@@ -95,17 +95,17 @@ class EmergencyScreen extends StatelessWidget {
           onPressed: () async {
             await Clipboard.setData(ClipboardData(text: shareLink));
             Get.back();
-            Get.snackbar('কপি হয়েছে', 'লোকেশন লিঙ্ক কপি হয়েছে',
+            Get.snackbar('copied'.tr, 'location_link_copied'.tr,
                 snackPosition: SnackPosition.BOTTOM);
           },
-          child: const Text('লিঙ্ক কপি করুন'),
+          child: Text('copy_link'.tr),
         ),
         TextButton(
           onPressed: () {
             Get.back();
             _openMaps('$lat,$lng');
           },
-          child: const Text('ম্যাপে দেখুন'),
+          child: Text('view_on_map'.tr),
         ),
       ],
     );

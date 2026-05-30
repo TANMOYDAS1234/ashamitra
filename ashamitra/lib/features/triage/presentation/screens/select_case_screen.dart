@@ -55,7 +55,7 @@ class _SelectCaseScreenState extends State<SelectCaseScreen> {
     // adjacent screens — that 8% rate difference makes Kore sound like
     // two different female voices to a non-technical ear, even though
     // it's the exact same voice model.
-    if (mounted) _tts.speak('পরিস্থিতি বলুন। মাইক বোতাম চাপুন।',
+    if (mounted) _tts.speak('speak_situation_prompt'.tr,
         tone: TtsTone.empathy);
   }
 
@@ -108,8 +108,8 @@ class _SelectCaseScreenState extends State<SelectCaseScreen> {
     // go straight to manual selection instead of showing a wrong case.
     if (result.confidence == 0.0) {
       Get.snackbar(
-        'বোঝা যায়নি',
-        'পরিস্থিতি শনাক্ত হয়নি। নিচে থেকে ম্যানুয়ালি বেছে নিন।',
+        'not_understood'.tr,
+        'not_understood_msg'.tr,
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: AppColors.warningYellow,
         colorText: AppColors.onBackground,
@@ -211,7 +211,7 @@ class _SelectCaseScreenState extends State<SelectCaseScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
-                  'অথবা ম্যানুয়ালি নির্বাচন করুন:',
+                  'or_pick_manually'.tr,
                   style: AppTextStyles.label.copyWith(color: AppColors.textSecondary),
                 ),
               ),
@@ -329,7 +329,7 @@ class _MicCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      listening ? 'শুনছি — থামাতে আবার চাপুন' : 'পরিস্থিতি বলুন',
+                      listening ? 'listening_tap_to_stop'.tr : 'speak_situation'.tr,
                       style: AppTextStyles.labelLg.copyWith(color: Colors.white),
                     ),
                     const SizedBox(height: 4),
@@ -337,8 +337,8 @@ class _MicCard extends StatelessWidget {
                       transcript.isNotEmpty
                           ? transcript
                           : listening
-                              ? 'বলুন...'
-                              : 'মাইক চাপুন, তারপর পরিস্থিতি বলুন',
+                              ? 'speak_now_dots'.tr
+                              : 'tap_mic_then_speak'.tr,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: AppTextStyles.bodySm.copyWith(color: Colors.white.withValues(alpha: 0.88)),

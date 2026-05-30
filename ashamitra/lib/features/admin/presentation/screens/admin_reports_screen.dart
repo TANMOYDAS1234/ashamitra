@@ -73,7 +73,7 @@ class AdminReportsScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
                       children: [
-                        _SummaryChip(label: 'মোট ${ctrl.totalReports}', color: AppColors.primary),
+                        _SummaryChip(label: 'total_n'.trParams({'count': '${ctrl.totalReports}'}), color: AppColors.primary),
                         const SizedBox(width: 8),
                         _SummaryChip(label: '🔴 ${ctrl.redReports}', color: AppColors.emergencyRed),
                         const SizedBox(width: 8),
@@ -136,10 +136,10 @@ class AdminReportsScreen extends StatelessWidget {
       lastDate: now,
       initialDatePickerMode: initialView,
       helpText: mode == 'day'
-          ? 'দিন বেছে নিন'
+          ? 'pick_day'.tr
           : mode == 'month'
-              ? 'মাস বেছে নিন'
-              : 'বছর বেছে নিন',
+              ? 'pick_month'.tr
+              : 'pick_year'.tr,
     );
     if (picked != null) ctrl.setFilter(mode, date: picked);
   }

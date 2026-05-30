@@ -197,11 +197,11 @@ class _PatientListScreenState extends State<PatientListScreen> {
                     return EmptyState(
                       icon: Icons.people_outline_rounded,
                       title: 'patient_empty'.tr,
-                      subtitle: 'নতুন রোগী যোগ করুন বা ভয়েস ট্রায়াজ শুরু করুন',
+                      subtitle: 'patient_list_subtitle_empty'.tr,
                       action: FilledButton.icon(
                         onPressed: () => Get.toNamed(AppRoutes.addPatient),
                         icon: const Icon(Icons.person_add_rounded, size: 18),
-                        label: const Text('রোগী যোগ করুন'),
+                        label: Text('add_patient'.tr),
                       ),
                     );
                   }
@@ -231,13 +231,13 @@ class _PatientListScreenState extends State<PatientListScreen> {
                             return await showDialog<bool>(
                               context: context,
                               builder: (_) => AlertDialog(
-                                title: const Text('রোগী মুছুন'),
+                                title: Text('delete_patient'.tr),
                                 content: Text('"${p.name}" তালিকা থেকে মুছে ফেলবেন?'),
                                 actions: [
-                                  TextButton(onPressed: () => Get.back(result: false), child: const Text('বাতিল')),
+                                  TextButton(onPressed: () => Get.back(result: false), child: Text('cancel'.tr)),
                                   TextButton(
                                     onPressed: () => Get.back(result: true),
-                                    child: const Text('মুছুন', style: TextStyle(color: AppColors.emergencyRed)),
+                                    child: Text('delete_patient_short'.tr, style: const TextStyle(color: AppColors.emergencyRed)),
                                   ),
                                 ],
                               ),

@@ -82,9 +82,9 @@ class _CaseConfirmScreenState extends State<CaseConfirmScreen> {
   }
 
   String get _confidenceLabel {
-    if (_confidence >= 0.85) return 'উচ্চ নিশ্চিততা';
-    if (_confidence >= 0.60) return 'মাঝারি নিশ্চিততা';
-    return 'কম নিশ্চিততা';
+    if (_confidence >= 0.85) return 'high_confidence'.tr;
+    if (_confidence >= 0.60) return 'medium_confidence'.tr;
+    return 'low_confidence'.tr;
   }
 
   @override
@@ -105,7 +105,7 @@ class _CaseConfirmScreenState extends State<CaseConfirmScreen> {
           children: [
             const CircularProgressIndicator(color: AppColors.primary),
             const SizedBox(height: 16),
-            Text('পরিস্থিতি বিশ্লেষণ হচ্ছে...', style: AppTextStyles.body),
+            Text('analyzing_situation'.tr, style: AppTextStyles.body),
           ],
         ),
       );
@@ -120,7 +120,7 @@ class _CaseConfirmScreenState extends State<CaseConfirmScreen> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const SizedBox(height: 32),
-          Text('পরিস্থিতি শনাক্ত হয়েছে', style: AppTextStyles.h1),
+          Text('case_recognized'.tr, style: AppTextStyles.h1),
           const SizedBox(height: 6),
           Text('ASHA-র বক্তব্য বিশ্লেষণ করা হয়েছে', style: AppTextStyles.bodySm),
 
@@ -171,7 +171,7 @@ class _CaseConfirmScreenState extends State<CaseConfirmScreen> {
                   children: [
                     _badge(_confidenceLabel, _confidenceColor),
                     _badge(
-                      _method == 'ai' ? 'AI শনাক্ত' : 'নিয়ম-ভিত্তিক',
+                      _method == 'ai' ? 'ai_detected'.tr : 'rule_based'.tr,
                       AppColors.primary,
                     ),
                   ],
@@ -200,7 +200,7 @@ class _CaseConfirmScreenState extends State<CaseConfirmScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               child: Text(
-                'হ্যাঁ, সঠিক — শুরু করুন',
+                'yes_correct_start'.tr,
                 style: AppTextStyles.labelLg.copyWith(color: AppColors.onPrimary),
               ),
             ),
@@ -221,7 +221,7 @@ class _CaseConfirmScreenState extends State<CaseConfirmScreen> {
                 side: const BorderSide(color: AppColors.primary),
                 shape: RoundedRectangleBorder(borderRadius: AppRadius.mdR),
               ),
-              child: Text('পরিবর্তন করুন', style: AppTextStyles.labelLg.copyWith(color: AppColors.primary)),
+              child: Text('change'.tr, style: AppTextStyles.labelLg.copyWith(color: AppColors.primary)),
             ),
           ),
           const SizedBox(height: 28),
@@ -251,7 +251,7 @@ class _CaseConfirmScreenState extends State<CaseConfirmScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('সঠিক পরিস্থিতি বেছে নিন', style: AppTextStyles.h3),
+            Text('pick_correct_case'.tr, style: AppTextStyles.h3),
             const SizedBox(height: 16),
             ..._allCases.map((c) => ListTile(
                   contentPadding: EdgeInsets.zero,
