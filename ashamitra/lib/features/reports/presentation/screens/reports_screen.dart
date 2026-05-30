@@ -556,14 +556,37 @@ class _ReportsScreenState extends State<ReportsScreen> {
     if (!mounted) return;
     messenger.hideCurrentSnackBar();
     if (snapshot == null) {
-      // The Dismissible already animated the card out, but rollback
-      // restored it in the underlying list — the Obx rebuild will bring
-      // it back. Tell the worker explicitly so they don't think the
-      // action was lost or duplicated.
+      // Specific reason from the last failed delete attempt. Helps the
+      // worker know whether to wait + retry (timeout / 5xx) or whether
+      // the report was already gone server-side (404). Generic "server
+      // not responding" was misleading on 404 / 401 / etc.
+      final status = ctrl.lastDeleteFailureStatus;
+      final String msg;
+      switch (status) {
+        case 0:
+          msg = 'সার্ভার এখন ধীর / নেটওয়ার্ক সমস্যা — আবার চেষ্টা করুন';
+          break;
+        case 401:
+          msg = 'লগইন মেয়াদ শেষ — আবার লগইন করুন';
+          break;
+        case 404:
+          msg = 'রিপোর্টটি সার্ভারে পাওয়া যায়নি — পুনরায় লোড করুন';
+          break;
+        case 500:
+        case 502:
+        case 503:
+        case 504:
+          msg = 'সার্ভার ত্রুটি ($status) — আবার চেষ্টা করুন';
+          break;
+        default:
+          msg = status != null
+              ? 'মুছে ফেলা যায়নি (HTTP $status) — আবার চেষ্টা করুন'
+              : 'সার্ভার সাড়া দিচ্ছে না — আবার চেষ্টা করুন';
+      }
       messenger.showSnackBar(
         SnackBar(
-          content: const Text('সার্ভার এখন সাড়া দিচ্ছে না — আবার চেষ্টা করুন'),
-          duration: const Duration(seconds: 4),
+          content: Text(msg),
+          duration: const Duration(seconds: 5),
           backgroundColor: AppColors.emergencyRed,
         ),
       );

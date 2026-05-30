@@ -634,23 +634,36 @@ class PatientController extends GetxController {
       }
     }
 
-    bool ok;
+    ({bool ok, int status, String? reason}) result;
     try {
-      ok = await ApiService.deleteReport(effectiveId);
+      result = await ApiService.deleteReport(effectiveId);
     } on UnauthorizedException {
       await restore();
       rethrow;
     }
-    if (!ok) {
-      // Server didn't confirm (timeout / cold-start / 5xx) — restore
-      // and let the UI surface a "delete failed" message.
+    if (!result.ok) {
+      // Stash the status code on the snapshot so the UI can surface a
+      // specific message instead of generic "server not responding".
       // ignore: avoid_print
-      print('[deleteReport] server didn\'t confirm $effectiveId — restoring');
+      print('[deleteReport] failed status=${result.status} reason=${result.reason} — restoring');
       await restore();
+      _lastDeleteFailureStatus = result.status;
+      _lastDeleteFailureReason = result.reason;
       return null;
     }
+    _lastDeleteFailureStatus = null;
+    _lastDeleteFailureReason = null;
     return snapshot;
   }
+
+  /// Status code from the last deleteReport failure (0 = timeout/network,
+  /// 401 = unauthorized, 404 = not found, 5xx = server error, etc.).
+  /// Null when the last delete succeeded. UI reads this to show a
+  /// specific reason in the failure snackbar.
+  int? _lastDeleteFailureStatus;
+  String? _lastDeleteFailureReason;
+  int? get lastDeleteFailureStatus => _lastDeleteFailureStatus;
+  String? get lastDeleteFailureReason => _lastDeleteFailureReason;
 
   /// Restores a soft-deleted report. Inserts it back at the top of the
   /// list (sorted-by-recency stays consistent) and clears deletedAt on

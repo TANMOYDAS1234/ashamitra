@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'local_storage_service.dart';
@@ -338,31 +339,36 @@ class ApiService {
   /// DELETE /reports/:id — soft-deletes the report (sets deletedAt on the
   /// server). The doc is preserved for admin audit; the worker just hides
   /// it from their view. Returns true on success.
-  static Future<bool> deleteReport(String reportId) async {
+  /// Returns a small status record so the UI can show a specific
+  /// reason instead of generic "server not responding". `status` is
+  /// the HTTP code (or 0 for network/timeout errors).
+  static Future<({bool ok, int status, String? reason})> deleteReport(
+      String reportId) async {
     try {
-      // 45-sec timeout covers Render free-tier cold-start. Without
-      // UptimeRobot keep-warm the first request after idle can take
-      // 30-50 sec; a 30-sec timeout used to fire spuriously and the
-      // strict-delete UI would surface as "server failed" on what was
-      // actually just a wake-up.
+      // 75-sec timeout covers Render cold-start with a comfortable
+      // margin (cold wake takes 30-60 sec on the free tier).
       final res = await http.delete(
         Uri.parse('$baseUrl/reports/$reportId'),
         headers: _headers,
-      ).timeout(const Duration(seconds: 45));
+      ).timeout(const Duration(seconds: 75));
       _guard(res.statusCode);
       if (res.statusCode != 200) {
         // ignore: avoid_print
         print('[deleteReport] HTTP ${res.statusCode}: ${res.body}');
-        return false;
+        return (ok: false, status: res.statusCode, reason: res.body);
       }
       final body = jsonDecode(res.body) as Map<String, dynamic>;
-      return body['success'] == true;
+      return (ok: body['success'] == true, status: 200, reason: null);
     } on UnauthorizedException {
-      rethrow; // let the controller propagate to AuthController.forceLogout
+      rethrow;
+    } on TimeoutException catch (e) {
+      // ignore: avoid_print
+      print('[deleteReport] timeout: $e');
+      return (ok: false, status: 0, reason: 'timeout');
     } catch (e) {
       // ignore: avoid_print
-      print('[deleteReport] error: $e');
-      return false;
+      print('[deleteReport] network error: $e');
+      return (ok: false, status: 0, reason: e.toString());
     }
   }
 
