@@ -475,20 +475,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('এই রিপোর্ট মুছে ফেলবেন?'),
-        content: const Text(
-          'রিপোর্টটি আপনার তালিকা থেকে সরিয়ে নেওয়া হবে। '
-          '৫ সেকেন্ডের মধ্যে "Undo" চেপে ফিরিয়ে আনা যাবে।',
-        ),
+        title: Text('delete_report_confirm'.tr),
+        content: Text('delete_report_confirm_msg'.tr),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('বাতিল'),
+            child: Text('cancel'.tr),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.emergencyRed),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('মুছে ফেলুন'),
+            child: Text('delete'.tr),
           ),
         ],
       ),
@@ -522,10 +519,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
     messenger.showSnackBar(
       SnackBar(
-        content: const Text('রিপোর্ট মুছে ফেলা হয়েছে'),
+        content: Text('report_deleted'.tr),
         duration: const Duration(seconds: 5),
         action: SnackBarAction(
-          label: 'Undo',
+          label: 'undo'.tr,
           textColor: Colors.white,
           onPressed: () => ctrl.restoreReport(snapshot),
         ),
@@ -705,8 +702,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
               Obx(() {
                 final visibleReports = ctrl.reports.where(_matchesFilters).toList();
                 return AppHeader(
-                  title: 'রিপোর্ট',
-                  subtitle: 'সকল ট্রায়াজ সেশন',
+                  title: 'reports_title'.tr,
+                  subtitle: 'reports_subtitle'.tr,
                   showBack: false,
                   actions: [
                     HeaderActionPill(
@@ -728,7 +725,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
                 child: Row(
                   children: [
-                    Text('ব্যান্ড',
+                    Text('filter_band'.tr,
                         style: AppTextStyles.caption.copyWith(
                             color: AppColors.textSecondary,
                             fontWeight: FontWeight.w700)),
@@ -748,24 +745,24 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   children: [
                     _ChipBtn(
-                      label: 'সব',
+                      label: 'filter_all'.tr,
                       selected: _bandFilter == 'all',
                       onTap: () => setState(() => _bandFilter = 'all'),
                     ),
                     _ChipBtn(
-                      label: 'জরুরি',
+                      label: 'filter_urgent'.tr,
                       color: AppColors.emergencyRed,
                       selected: _bandFilter == 'emergency',
                       onTap: () => setState(() => _bandFilter = 'emergency'),
                     ),
                     _ChipBtn(
-                      label: 'মনোযোগ',
+                      label: 'filter_attention'.tr,
                       color: AppColors.warningYellow,
                       selected: _bandFilter == 'attention',
                       onTap: () => setState(() => _bandFilter = 'attention'),
                     ),
                     _ChipBtn(
-                      label: 'নিরাপদ',
+                      label: 'filter_safe'.tr,
                       color: AppColors.safeGreen,
                       selected: _bandFilter == 'safe',
                       onTap: () => setState(() => _bandFilter = 'safe'),
@@ -776,7 +773,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Text('সময়',
+                child: Text('filter_time'.tr,
                     style: AppTextStyles.caption.copyWith(
                         color: AppColors.textSecondary,
                         fontWeight: FontWeight.w700)),
@@ -789,22 +786,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   children: [
                     _ChipBtn(
-                      label: 'সব সময়',
+                      label: 'filter_all_time'.tr,
                       selected: _timeFilter == 'all',
                       onTap: () => setState(() => _timeFilter = 'all'),
                     ),
                     _ChipBtn(
-                      label: 'আজ',
+                      label: 'filter_today'.tr,
                       selected: _timeFilter == 'today',
                       onTap: () => setState(() => _timeFilter = 'today'),
                     ),
                     _ChipBtn(
-                      label: '৭ দিন',
+                      label: 'filter_week'.tr,
                       selected: _timeFilter == 'week',
                       onTap: () => setState(() => _timeFilter = 'week'),
                     ),
                     _ChipBtn(
-                      label: 'এই মাস',
+                      label: 'filter_month'.tr,
                       selected: _timeFilter == 'month',
                       onTap: () => setState(() => _timeFilter = 'month'),
                     ),
@@ -862,24 +859,24 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   });
 
                   if (allReports.isEmpty) {
-                    return const EmptyState(
+                    return EmptyState(
                       icon: Icons.assignment_outlined,
-                      title: 'এখনো কোনো রিপোর্ট নেই',
-                      subtitle: 'ট্রায়াজ সম্পন্ন করলে এখানে রিপোর্ট দেখাবে',
+                      title: 'no_reports_yet'.tr,
+                      subtitle: 'no_reports_subtitle'.tr,
                     );
                   }
                   if (reports.isEmpty) {
                     return EmptyState(
                       icon: Icons.filter_alt_off_rounded,
-                      title: 'এই ফিল্টারে কোনো রিপোর্ট নেই',
-                      subtitle: 'অন্য ব্যান্ড বা সময় বেছে নিন',
+                      title: 'no_filter_matches'.tr,
+                      subtitle: 'no_filter_matches_subtitle'.tr,
                       action: FilledButton.icon(
                         onPressed: () => setState(() {
                           _bandFilter = 'all';
                           _timeFilter = 'all';
                         }),
                         icon: const Icon(Icons.clear_rounded, size: 18),
-                        label: const Text('ফিল্টার মুছে ফেলুন'),
+                        label: Text('clear_filter'.tr),
                       ),
                     );
                   }
@@ -909,25 +906,25 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         Row(
                           children: [
                             _StatCard(
-                                label: 'মোট কেস',
+                                label: 'report_total'.tr,
                                 count: '$total',
                                 icon: Icons.assignment_rounded,
                                 color: AppColors.primary),
                             const SizedBox(width: 8),
                             _StatCard(
-                                label: 'জরুরি',
+                                label: 'filter_urgent'.tr,
                                 count: '$emergency',
                                 icon: Icons.emergency_rounded,
                                 color: AppColors.emergencyRed),
                             const SizedBox(width: 8),
                             _StatCard(
-                                label: 'মনোযোগ',
+                                label: 'filter_attention'.tr,
                                 count: '$attention',
                                 icon: Icons.warning_amber_rounded,
                                 color: AppColors.warningYellow),
                             const SizedBox(width: 8),
                             _StatCard(
-                                label: 'নিরাপদ',
+                                label: 'filter_safe'.tr,
                                 count: '$safe',
                                 icon: Icons.check_circle_rounded,
                                 color: AppColors.safeGreen),
@@ -938,7 +935,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         _CaseBreakdown(reports: reports.toList()),
                         const SizedBox(height: 20),
 
-                        Text('সেশন ইতিহাস', style: AppTextStyles.h3),
+                        Text('session_history'.tr, style: AppTextStyles.h3),
                         const SizedBox(height: 10),
 
                         ...reports.asMap().entries.map((entry) {
@@ -965,14 +962,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                 color: AppColors.emergencyRed,
                                 borderRadius: AppRadius.lgR,
                               ),
-                              child: const Row(
+                              child: Row(
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
-                                  Icon(Icons.delete_outline_rounded,
+                                  const Icon(Icons.delete_outline_rounded,
                                       color: Colors.white, size: 24),
-                                  SizedBox(width: 8),
-                                  Text('মুছে ফেলুন',
-                                      style: TextStyle(
+                                  const SizedBox(width: 8),
+                                  Text('delete'.tr,
+                                      style: const TextStyle(
                                           color: Colors.white,
                                           fontWeight: FontWeight.w600)),
                                 ],
@@ -1737,7 +1734,7 @@ class _SortToggle extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Text(
-                isNewest ? 'নতুন আগে' : 'পুরাতন আগে',
+                isNewest ? 'sort_newest'.tr : 'sort_oldest'.tr,
                 style: AppTextStyles.caption.copyWith(
                   color: AppColors.primary,
                   fontWeight: FontWeight.w700,

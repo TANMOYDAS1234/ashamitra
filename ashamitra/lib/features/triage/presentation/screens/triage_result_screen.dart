@@ -320,7 +320,7 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'ট্রায়াজ ফলাফল',
+                        'triage_result'.tr,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: AppTextStyles.h1,
@@ -475,7 +475,7 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
       setState(() => _attachedPatientName = newPatient.name);
     }
     Get.snackbar(
-      ok ? 'যুক্ত হয়েছে' : 'যুক্ত হয়েছে (অফলাইন)',
+      ok ? 'patient_attached'.tr : 'patient_attached_local'.tr,
       ok
           ? '${newPatient.name} এই রিপোর্টের সাথে যুক্ত করা হয়েছে।'
           : '${newPatient.name} স্থানীয়ভাবে যুক্ত — সার্ভারে পরে সিঙ্ক হবে।',
@@ -497,8 +497,8 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
     final patients = ctrl.patients.toList();
     if (patients.isEmpty) {
       Get.snackbar(
-        'কোনো রোগী নেই',
-        'প্রথমে রোগী যোগ করুন, তারপর এই রিপোর্টে যুক্ত করুন।',
+        'no_patients_yet'.tr,
+        'no_patients_add_first'.tr,
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: AppColors.warningYellow,
         colorText: Colors.white,
@@ -547,10 +547,10 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                       ),
                     ),
                   ),
-                  const Align(
+                  Align(
                     alignment: Alignment.centerLeft,
-                    child: Text('রোগী নির্বাচন করুন',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    child: Text('select_patient'.tr,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                   ),
                   const SizedBox(height: 12),
                   // ── Quick "register a new patient" entry ───────────────
@@ -582,14 +582,14 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                                     CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'নতুন রোগী যোগ করুন',
+                                    'add_new_patient'.tr,
                                     style: AppTextStyles.label.copyWith(
                                       color: AppColors.accent,
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
                                   Text(
-                                    'কেসের ধরন আগে থেকেই বেছে নেওয়া আছে',
+                                    'add_new_patient_subtitle'.tr,
                                     style: AppTextStyles.caption,
                                   ),
                                 ],
@@ -607,19 +607,19 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                   const SizedBox(height: 10),
                   TextField(
                     onChanged: (v) => setSheetState(() => query = v),
-                    decoration: const InputDecoration(
-                      hintText: 'নাম, গ্রাম বা মোবাইল দিয়ে খুঁজুন',
-                      prefixIcon: Icon(Icons.search_rounded,
+                    decoration: InputDecoration(
+                      hintText: 'search_patients_hint'.tr,
+                      prefixIcon: const Icon(Icons.search_rounded,
                           color: AppColors.primary, size: 22),
                     ),
                   ),
                   const SizedBox(height: 8),
                   Expanded(
                     child: filtered.isEmpty
-                        ? const Center(
+                        ? Center(
                             child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 32),
-                              child: Text('কোনো ফলাফল পাওয়া যায়নি'),
+                              padding: const EdgeInsets.symmetric(vertical: 32),
+                              child: Text('no_matches_found'.tr),
                             ),
                           )
                         : ListView.separated(
@@ -656,7 +656,7 @@ class _TriageResultScreenState extends State<TriageResultScreen> {
                                       setState(() => _attachedPatientName = p.name);
                                     }
                                     Get.snackbar(
-                                      ok ? 'যুক্ত হয়েছে' : 'যুক্ত হয়েছে (অফলাইন)',
+                                      ok ? 'patient_attached'.tr : 'patient_attached_local'.tr,
                                       ok
                                           ? '${p.name} এই রিপোর্টের সাথে যুক্ত করা হয়েছে।'
                                           : '${p.name} স্থানীয়ভাবে যুক্ত — সার্ভারে পরে সিঙ্ক হবে।',
@@ -756,13 +756,13 @@ class _AttachPatientCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'রোগী যুক্ত করুন',
+                      'add_patient_now'.tr,
                       style: AppTextStyles.label.copyWith(
                           color: AppColors.primary, fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'এই রিপোর্টটি এখনো কোনো রোগীর সাথে যুক্ত নয়।',
+                      'add_patient_now_subtitle'.tr,
                       style: AppTextStyles.bodySm.copyWith(
                           color: AppColors.textSecondary),
                     ),

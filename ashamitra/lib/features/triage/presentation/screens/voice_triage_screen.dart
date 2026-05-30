@@ -107,7 +107,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
     _moduleId  = _toModuleId(_caseType);
     _patientId   = map['patientId']   as String?;
     _patientName = map['patientName'] as String?;
-    _statusText = 'মাইক ট্যাপ করুন কথা বলতে';
+    _statusText = 'tap_mic_to_speak'.tr;
     _offlineBrain.init(Get.find<RuleExecutor>());
     // Engine-grounded Q&A: lets the CLUP pipeline answer ASHA's clinical
     // questions ("জ্বর কত হলে বিপদ?") using the live rule engine offline.
@@ -360,7 +360,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
       _isProcessing = true;
       _transcript = input;
       _orbState = OrbState.processing;
-      _statusText = 'সংযোগ করছি...';
+      _statusText = 'connecting'.tr;
     });
     _history.add(ConversationTurn(role: 'asha', text: input));
     _turnCount++;
@@ -370,7 +370,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
     _coldStartHintTimer?.cancel();
     _coldStartHintTimer = Timer(const Duration(seconds: 5), () {
       if (mounted && _isProcessing) {
-        setState(() => _statusText = 'সার্ভার জাগাচ্ছি, একটু অপেক্ষা করুন...');
+        setState(() => _statusText = 'waking_server'.tr);
       }
     });
     final online = await _hasInternet();
@@ -420,7 +420,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
     ConversationResponse response;
     try {
       final authToken = LocalStorageService.get('jwt_token');
-      if (mounted) setState(() => _statusText = 'সংযোগ করছি...');
+      if (mounted) setState(() => _statusText = 'connecting'.tr);
       response = await _conversationService.respond(
         caseType: _caseType,
         moduleId: _moduleId,
@@ -457,7 +457,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
     if (!mounted) return;
     setState(() {
       _streamingPartial = '';
-      _statusText = 'বিশ্লেষণ করছি...';
+      _statusText = 'analyzing'.tr;
     });
 
     // Merge Gemini extractions (Gemini handles complex multi-symptom replies)
@@ -492,7 +492,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
     setState(() {
       _isProcessing = false;
       _orbState = OrbState.idle;
-      _statusText = 'মাইক ট্যাপ করুন কথা বলতে';
+      _statusText = 'tap_mic_to_speak'.tr;
       _transcript = '';
     });
 
@@ -611,7 +611,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
       setState(() {
         _isProcessing = false;
         _orbState = OrbState.idle;
-        _statusText = 'মাইক ট্যাপ করুন কথা বলতে';
+        _statusText = 'tap_mic_to_speak'.tr;
         _transcript = '';
       });
       await _speakEmergency(earlyCombo);
@@ -631,7 +631,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
       setState(() {
         _isProcessing = false;
         _orbState = OrbState.idle;
-        _statusText = 'মাইক ট্যাপ করুন কথা বলতে';
+        _statusText = 'tap_mic_to_speak'.tr;
         _transcript = '';
       });
       await _speakEmergency(emergencyText);
@@ -653,7 +653,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
         _isProcessing = false;
         _riskLevel = 'emergency';
         _orbState = OrbState.idle;
-        _statusText = 'মাইক ট্যাপ করুন কথা বলতে';
+        _statusText = 'tap_mic_to_speak'.tr;
         _transcript = '';
       });
       await _speakEmergency(emergencyText);
@@ -693,7 +693,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
       setState(() {
         _isProcessing = false;
         _orbState = OrbState.idle;
-        _statusText = 'মাইক ট্যাপ করুন কথা বলতে';
+        _statusText = 'tap_mic_to_speak'.tr;
         _transcript = '';
       });
       await _speakClosingSummary();
@@ -717,7 +717,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
       setState(() {
         _isProcessing = false;
         _orbState = OrbState.idle;
-        _statusText = 'মাইক ট্যাপ করুন কথা বলতে';
+        _statusText = 'tap_mic_to_speak'.tr;
         _transcript = '';
       });
       await _speakEmergency(next.combinationAlertBn!);
@@ -754,7 +754,7 @@ class _VoiceTriageScreenState extends State<VoiceTriageScreen> {
     setState(() {
       _isProcessing = false;
       _orbState = OrbState.idle;
-      _statusText = 'মাইক ট্যাপ করুন কথা বলতে';
+      _statusText = 'tap_mic_to_speak'.tr;
       _transcript = '';
     });
     await _speakQuestion(responseText);

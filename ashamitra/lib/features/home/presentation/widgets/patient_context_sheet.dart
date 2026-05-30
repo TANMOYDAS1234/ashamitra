@@ -183,7 +183,7 @@ class PatientContextSheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(caseTitle, style: AppTextStyles.h3),
-                      Text('কার জন্য এই চেকআপ?', style: AppTextStyles.bodySm),
+                      Text('checkup_for_whom'.tr, style: AppTextStyles.bodySm),
                     ],
                   ),
                 ),
@@ -194,8 +194,8 @@ class PatientContextSheet extends StatelessWidget {
             // ── Option 1: existing patient ─────────────────────────────
             _ContextOption(
               icon: Icons.people_alt_rounded,
-              title: 'চলমান রোগী নির্বাচন করুন',
-              subtitle: 'আগে থেকে যুক্ত রোগীদের তালিকা থেকে বেছে নিন',
+              title: 'pick_existing_patient'.tr,
+              subtitle: 'pick_existing_patient_sub'.tr,
               color: AppColors.primary,
               onTap: () => _pickExistingPatient(context),
             ),
@@ -204,8 +204,8 @@ class PatientContextSheet extends StatelessWidget {
             // ── Option 2: add new patient ──────────────────────────────
             _ContextOption(
               icon: Icons.person_add_alt_1_rounded,
-              title: 'নতুন রোগী যোগ করুন',
-              subtitle: 'এখনই নাম, গ্রাম, মোবাইল দিন — পরে চেকআপ শুরু হবে',
+              title: 'add_new_patient_sheet'.tr,
+              subtitle: 'add_new_patient_sheet_sub'.tr,
               color: AppColors.accent,
               onTap: _addNewPatient,
               recommended: true,
@@ -215,8 +215,8 @@ class PatientContextSheet extends StatelessWidget {
             // ── Option 3: anonymous ────────────────────────────────────
             _ContextOption(
               icon: Icons.flash_on_rounded,
-              title: 'অনামী ট্রায়াজ',
-              subtitle: 'দ্রুত পরিস্থিতি যাচাই — পরে রোগী যোগ করা যাবে',
+              title: 'anonymous_triage'.tr,
+              subtitle: 'anonymous_triage_sub'.tr,
               color: AppColors.textSecondary,
               onTap: () => _navigateToTriage(),
             ),
@@ -286,9 +286,9 @@ class _ContextOption extends StatelessWidget {
                               color: AppColors.accent,
                               borderRadius: AppRadius.pillR,
                             ),
-                            child: const Text(
-                              'প্রস্তাবিত',
-                              style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800),
+                            child: Text(
+                              'recommended'.tr,
+                              style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800),
                             ),
                           ),
                         ],
@@ -368,7 +368,7 @@ class _ExistingPatientPickerState extends State<_ExistingPatientPicker> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('চলমান রোগী নির্বাচন করুন', style: AppTextStyles.h2),
+                  Text('pick_existing_patient'.tr, style: AppTextStyles.h2),
                   const SizedBox(height: 2),
                   Text(
                     widget.caseTitle,
@@ -381,9 +381,9 @@ class _ExistingPatientPickerState extends State<_ExistingPatientPicker> {
             TextField(
               autofocus: false,
               onChanged: (v) => setState(() => _query = v),
-              decoration: const InputDecoration(
-                hintText: 'নাম, গ্রাম বা মোবাইল দিয়ে খুঁজুন',
-                prefixIcon: Icon(Icons.search_rounded, color: AppColors.primary, size: 22),
+              decoration: InputDecoration(
+                hintText: 'search_patients_hint'.tr,
+                prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primary, size: 22),
               ),
             ),
             const SizedBox(height: 8),
@@ -394,8 +394,8 @@ class _ExistingPatientPickerState extends State<_ExistingPatientPicker> {
                         padding: const EdgeInsets.symmetric(vertical: 32),
                         child: Text(
                           widget.patients.isEmpty
-                              ? 'এখনো কোনো রোগী যোগ করা হয়নি'
-                              : 'কোনো ফলাফল পাওয়া যায়নি',
+                              ? 'no_patients_added_yet'.tr
+                              : 'no_matches_found'.tr,
                           style: AppTextStyles.bodySm,
                         ),
                       ),
