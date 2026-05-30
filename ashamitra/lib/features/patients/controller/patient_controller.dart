@@ -170,9 +170,36 @@ class PatientController extends GetxController {
       }
       _pendingReportDeletes.value = keptPending;
 
+      // Hide reports that are STILL pending deletion from the worker's
+      // view. Without this filter, a report whose server-side delete
+      // failed (offline / cold-start) would visually reappear in the
+      // list after every sync — even though the worker tapped delete
+      // and the snackbar said "deleted". The pending entry keeps the
+      // promise: the next sync's drain will retry the server DELETE.
+      bool isPendingDeleted(Map<String, dynamic> r) {
+        final rid = r['id']?.toString() ?? '';
+        final rSit = r['situation']?.toString().trim() ?? '';
+        final rCT = r['caseType']?.toString() ?? '';
+        final rCreated = DateTime.tryParse(r['createdAt']?.toString() ?? '');
+        for (final p in keptPending) {
+          final pid = p['id']?.toString() ?? '';
+          if (pid.isNotEmpty && pid == rid) return true;
+          if (p['caseType']?.toString() == rCT &&
+              (p['situation']?.toString().trim() ?? '') == rSit) {
+            final pCreated = DateTime.tryParse(p['createdAt']?.toString() ?? '');
+            if (rCreated != null && pCreated != null) {
+              final diff = (rCreated.difference(pCreated).inMilliseconds).abs();
+              if (diff <= 5 * 60 * 1000) return true;
+            }
+          }
+        }
+        return false;
+      }
+      final visibleRemote = remoteReports.where((r) => !isPendingDeleted(r)).toList();
+
       // Keep only reports that STILL failed to upload (genuinely offline).
       final stillPending = reports.where(_isPendingReport).toList();
-      final merged = [...remoteReports, ...stillPending]
+      final merged = [...visibleRemote, ...stillPending]
         ..sort((a, b) {
           final da = DateTime.tryParse(a['createdAt']?.toString() ?? '') ?? DateTime(0);
           final db = DateTime.tryParse(b['createdAt']?.toString() ?? '') ?? DateTime(0);

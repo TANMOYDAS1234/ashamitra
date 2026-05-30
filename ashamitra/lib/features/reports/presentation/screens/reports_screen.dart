@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:isolate';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -398,6 +399,57 @@ Future<List<int>> _buildPdfBytes(
   return doc.save();
 }
 
+/// Last-resort minimal PDF: no Bengali font, no styled cards, no isolates.
+/// Just a plain Helvetica title + one row per report. Used as the guaranteed
+/// fallback if the fancy build throws or hangs on every other path. Bengali
+/// strings render as boxes here (Helvetica doesn't have the glyphs) but the
+/// English-only fields (date / band / case ID / risk score) still come out
+/// readable, so the worker can at least see WHAT was triaged WHEN.
+Future<List<int>> _buildMinimalPdfBytes(
+    List<Map<String, dynamic>> reports, String generatedAt) async {
+  final doc = pw.Document();
+  doc.addPage(pw.MultiPage(
+    pageFormat: PdfPageFormat.a4,
+    margin: const pw.EdgeInsets.all(28),
+    maxPages: 50,
+    build: (ctx) => [
+      pw.Text('ASHA Mitra — Triage Reports',
+          style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+      pw.Text('Generated: $generatedAt',
+          style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+      pw.Text('Total: ${reports.length}',
+          style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+      pw.SizedBox(height: 12),
+      pw.TableHelper.fromTextArray(
+        headers: ['#', 'Date', 'Case ID', 'Band', 'Risk'],
+        data: List.generate(reports.length, (i) {
+          final r = reports[i];
+          String fmt(String? iso) {
+            if (iso == null) return '—';
+            try {
+              final d = DateTime.parse(iso);
+              return '${d.day}/${d.month}/${d.year} '
+                  '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+            } catch (_) { return iso; }
+          }
+          return [
+            '${i + 1}',
+            fmt(r['createdAt']?.toString()),
+            r['caseType']?.toString() ?? '—',
+            r['finalBand']?.toString() ?? '—',
+            '${r['riskScore'] ?? 0}',
+          ];
+        }),
+        headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9),
+        headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
+        cellStyle: const pw.TextStyle(fontSize: 9),
+        cellAlignment: pw.Alignment.centerLeft,
+      ),
+    ],
+  ));
+  return doc.save();
+}
+
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
 
@@ -622,12 +674,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
           '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}  '
           '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
-      // 3. Build the PDF. Try the isolate first (off-UI, won't ANR) but
-      // with a 90-sec timeout: pilot devices have hit cases where
-      // Isolate.run hangs silently when the pdf library trips over a
-      // specific font / Unicode combo, leaving the loading dialog up
-      // forever. If we hit the timeout we fall back to a UI-thread
-      // build — slower but always terminates.
+      // 3. Build the PDF with layered timeouts so the loading dialog can
+      // never hang forever:
+      //   a) Isolate path, 90 sec — fast, off-UI, won't ANR
+      //   b) UI-thread fancy build, 60 sec — slower but main-thread,
+      //      runs if the isolate hits a font / Unicode bug
+      //   c) UI-thread minimal English-only fallback — Helvetica + a
+      //      flat table, no Bengali, no styled cards, never hits the
+      //      pdf-library edge cases that caused the earlier hangs.
       List<int> bytes;
       try {
         bytes = await Isolate.run(
@@ -637,12 +691,21 @@ class _ReportsScreenState extends State<ReportsScreen> {
         print('[PDF] isolate returned ${bytes.length} bytes');
       } catch (e) {
         // ignore: avoid_print
-        print('[PDF] isolate failed/timeout ($e) — falling back to UI-thread build');
-        bytes = await _buildPdfBytes(
-          (regularBytes, boldBytes, reports, generatedAt),
-        );
-        // ignore: avoid_print
-        print('[PDF] UI-thread build returned ${bytes.length} bytes');
+        print('[PDF] isolate failed ($e) — trying UI-thread fancy build');
+        try {
+          bytes = await _buildPdfBytes(
+            (regularBytes, boldBytes, reports, generatedAt),
+          ).timeout(const Duration(seconds: 60));
+          // ignore: avoid_print
+          print('[PDF] UI-thread fancy returned ${bytes.length} bytes');
+        } catch (e2) {
+          // ignore: avoid_print
+          print('[PDF] UI-thread fancy failed ($e2) — minimal fallback');
+          bytes = await _buildMinimalPdfBytes(reports, generatedAt)
+              .timeout(const Duration(seconds: 30));
+          // ignore: avoid_print
+          print('[PDF] minimal fallback returned ${bytes.length} bytes');
+        }
       }
       // ignore: avoid_print
       print('[PDF] dismissing dialog');
@@ -654,10 +717,28 @@ class _ReportsScreenState extends State<ReportsScreen> {
         dialogShown = false;
       }
 
-      // 4. Persist + open via PdfHelper. Snackbar fires inside on result.
+      // 4. Persist + open via PdfHelper. Wrapped in its own timeout so
+      // OpenFile.open hanging (no PDF viewer installed, permission
+      // issue) doesn't leave the worker stuck waiting either.
       final fileName =
           'asha_mitra_report_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}.pdf';
-      await PdfHelper.saveAndOpen(bytes, fileName);
+      try {
+        await PdfHelper.saveAndOpen(bytes, fileName)
+            .timeout(const Duration(seconds: 15));
+      } on TimeoutException {
+        // ignore: avoid_print
+        print('[PDF] saveAndOpen timed out — file probably saved but viewer hung');
+        Get.snackbar(
+          'PDF সংরক্ষিত',
+          'ফাইল ম্যানেজার থেকে $fileName খুলুন।',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: AppColors.warningYellow,
+          colorText: Colors.white,
+          margin: const EdgeInsets.all(16),
+          borderRadius: 12,
+          duration: const Duration(seconds: 5),
+        );
+      }
       // ignore: avoid_print
       print('[PDF] saveAndOpen returned');
     } catch (e, st) {
