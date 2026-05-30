@@ -560,32 +560,58 @@ class PatientController extends GetxController {
     // Local says synced but the id we have is a placeholder. The server
     // has the same row under a real Mongo _id. Force a sync to refresh
     // the local id, then re-locate the report by content match.
+    //
+    // Important: we CANNOT match on createdAt equality. Mongoose's
+    // timestamps:true autosets createdAt to its own clock when the doc
+    // is inserted, ignoring any client-supplied value. So server's
+    // createdAt differs from the local one by hundreds of ms (network
+    // round-trip). The match below is tolerant — same caseType + same
+    // situation + closest createdAt within a 5-minute window.
     String effectiveId = reportId;
     if (snapshot['synced'] == true && !isMongoId(reportId)) {
       try {
         await syncFromServer();
       } catch (_) { /* offline — fall through */ }
-      // Re-find by content (createdAt + situation + caseType). The sync
-      // pulled the server copy with its real _id; match it back to the
-      // snapshot the worker meant to delete.
-      final match = reports.firstWhere(
-        (r) =>
-            r['createdAt'] == snapshot['createdAt'] &&
-            r['situation'] == snapshot['situation'] &&
-            r['caseType']  == snapshot['caseType'],
-        orElse: () => <String, dynamic>{},
+
+      final snapCreated = DateTime.tryParse(
+        snapshot['createdAt']?.toString() ?? '',
       );
-      if (match.isNotEmpty && match['id'] is String &&
-          isMongoId(match['id'] as String)) {
-        effectiveId = match['id'] as String;
-        // Remove the newly-resurrected copy locally — we're about to
-        // delete it server-side too.
+      final snapSituation = snapshot['situation']?.toString().trim() ?? '';
+      final snapCaseType  = snapshot['caseType']?.toString() ?? '';
+      final snapBand      = snapshot['finalBand']?.toString() ?? '';
+
+      // Score every Mongo-id report in the freshly synced list. Lower
+      // score = closer match. Pick the closest one inside 5 min.
+      Map<String, dynamic>? bestMatch;
+      int bestScore = 1 << 30;
+      for (final r in reports) {
+        final id = r['id']?.toString() ?? '';
+        if (!isMongoId(id)) continue;
+        if (r['caseType']?.toString() != snapCaseType) continue;
+        if ((r['situation']?.toString().trim() ?? '') != snapSituation) continue;
+        // Optional band check — protects against duplicate situations.
+        if (snapBand.isNotEmpty &&
+            (r['finalBand']?.toString() ?? '') != snapBand) {
+          continue;
+        }
+        final created = DateTime.tryParse(r['createdAt']?.toString() ?? '');
+        final diff = (snapCreated != null && created != null)
+            ? (created.difference(snapCreated).inMilliseconds).abs()
+            : 0;
+        if (diff < bestScore) {
+          bestScore = diff;
+          bestMatch = r;
+        }
+      }
+      // 5 min tolerance covers cold-start delays + clock skew.
+      if (bestMatch != null && bestScore <= 5 * 60 * 1000) {
+        effectiveId = bestMatch['id'] as String;
         reports.removeWhere((r) => r['id'] == effectiveId);
         reports.refresh();
         await LocalStorageService.saveReports(reports.toList());
       } else {
-        // Still no Mongo id after sync — server lost this row OR sync
-        // failed. Treat as local-only success (it's gone from this device).
+        // No reasonable match — server probably lost this row OR sync
+        // failed. Treat as local-only success (gone from this device).
         return snapshot;
       }
     }
