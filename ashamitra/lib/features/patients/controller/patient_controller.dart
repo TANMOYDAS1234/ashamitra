@@ -8,15 +8,6 @@ class PatientController extends GetxController {
   final isLoading = false.obs;
   final patients  = <PatientModel>[].obs;
   final reports   = <Map<String, dynamic>>[].obs;
-  /// Reports the worker has soft-deleted locally but whose server-side
-  /// soft-delete hasn't been confirmed yet. Each entry is the full report
-  /// snapshot so we can re-locate the server doc on the next sync (by id
-  /// if it's already a Mongo _id, otherwise by content match). Drained
-  /// inside syncFromServer after the fresh server reports are pulled, so
-  /// a stale-id report + a sync race + an offline failure can ALL retry
-  /// rather than silently leaving the server row intact.
-  /// (Distinct from `_pendingDeletes` below, which is the patients queue.)
-  final _pendingReportDeletes = <Map<String, dynamic>>[].obs;
 
   /// Patients the user deleted while offline (or after a failed server delete).
   /// Hidden from UI but retained until the next online sync can confirm the
@@ -108,98 +99,12 @@ class PatientController extends GetxController {
           .map((e) => _sanitizeReport(_remoteToLocal(e as Map<String, dynamic>)))
           .toList();
 
-      // ── Drain pending report-deletes ────────────────────────────────
-      // Each entry is a snapshot of a report the worker soft-deleted
-      // locally but couldn't confirm server-side (race vs the upload,
-      // offline at delete time, stale placeholder id, etc). Match each
-      // pending entry against the freshly pulled remoteReports and
-      // actually call DELETE on the server now that we have the real id.
-      // Successes are removed from the queue. Failures (still offline,
-      // or no match found) stay queued and retry on the next sync.
-      // Without this, a deleted report would reappear after sync because
-      // the server still has it.
-      final keptPending = <Map<String, dynamic>>[];
-      for (final pending in _pendingReportDeletes) {
-        final pid = pending['id']?.toString() ?? '';
-        Map<String, dynamic>? serverDoc;
-        // Fast path: pending entry already has a Mongo _id.
-        if (RegExp(r'^[0-9a-fA-F]{24}$').hasMatch(pid)) {
-          serverDoc = remoteReports.firstWhere(
-            (r) => r['id'] == pid,
-            orElse: () => <String, dynamic>{},
-          );
-          if (serverDoc.isEmpty) serverDoc = null;
-        }
-        // Stale-id path: locate by content (caseType + situation + ±5min).
-        if (serverDoc == null) {
-          final pCreated = DateTime.tryParse(pending['createdAt']?.toString() ?? '');
-          final pSit = pending['situation']?.toString().trim() ?? '';
-          final pCT  = pending['caseType']?.toString() ?? '';
-          int bestScore = 1 << 30;
-          Map<String, dynamic>? best;
-          for (final r in remoteReports) {
-            if (r['caseType']?.toString() != pCT) continue;
-            if ((r['situation']?.toString().trim() ?? '') != pSit) continue;
-            final c = DateTime.tryParse(r['createdAt']?.toString() ?? '');
-            final diff = (pCreated != null && c != null)
-                ? (c.difference(pCreated).inMilliseconds).abs() : 0;
-            if (diff < bestScore) { bestScore = diff; best = r; }
-          }
-          if (best != null && bestScore <= 5 * 60 * 1000) serverDoc = best;
-        }
-        if (serverDoc == null) {
-          // Server doesn't have it (or content drifted) — give up.
-          // ignore: avoid_print
-          print('[deleteReport] no server match for pending $pid, dropping');
-          continue;
-        }
-        final realId = serverDoc['id']?.toString() ?? '';
-        if (realId.isEmpty) continue;
-        try {
-          final ok = await ApiService.deleteReport(realId);
-          if (ok) {
-            // ignore: avoid_print
-            print('[deleteReport] retry-deleted $realId server-side');
-            remoteReports.removeWhere((r) => r['id'] == realId);
-          } else {
-            keptPending.add(pending);
-          }
-        } catch (_) {
-          keptPending.add(pending);
-        }
-      }
-      _pendingReportDeletes.value = keptPending;
-
-      // Hide reports that are STILL pending deletion from the worker's
-      // view. Without this filter, a report whose server-side delete
-      // failed (offline / cold-start) would visually reappear in the
-      // list after every sync — even though the worker tapped delete
-      // and the snackbar said "deleted". The pending entry keeps the
-      // promise: the next sync's drain will retry the server DELETE.
-      bool isPendingDeleted(Map<String, dynamic> r) {
-        final rid = r['id']?.toString() ?? '';
-        final rSit = r['situation']?.toString().trim() ?? '';
-        final rCT = r['caseType']?.toString() ?? '';
-        final rCreated = DateTime.tryParse(r['createdAt']?.toString() ?? '');
-        for (final p in keptPending) {
-          final pid = p['id']?.toString() ?? '';
-          if (pid.isNotEmpty && pid == rid) return true;
-          if (p['caseType']?.toString() == rCT &&
-              (p['situation']?.toString().trim() ?? '') == rSit) {
-            final pCreated = DateTime.tryParse(p['createdAt']?.toString() ?? '');
-            if (rCreated != null && pCreated != null) {
-              final diff = (rCreated.difference(pCreated).inMilliseconds).abs();
-              if (diff <= 5 * 60 * 1000) return true;
-            }
-          }
-        }
-        return false;
-      }
-      final visibleRemote = remoteReports.where((r) => !isPendingDeleted(r)).toList();
-
       // Keep only reports that STILL failed to upload (genuinely offline).
+      // Strict-delete mode (current): no pending-deletes queue. Every
+      // successful delete is confirmed by the server before the local
+      // row is removed, so syncFromServer's only job here is the merge.
       final stillPending = reports.where(_isPendingReport).toList();
-      final merged = [...visibleRemote, ...stillPending]
+      final merged = [...remoteReports, ...stillPending]
         ..sort((a, b) {
           final da = DateTime.tryParse(a['createdAt']?.toString() ?? '') ?? DateTime(0);
           final db = DateTime.tryParse(b['createdAt']?.toString() ?? '') ?? DateTime(0);
@@ -623,22 +528,27 @@ class PatientController extends GetxController {
     return updated != null;
   }
 
-  /// Soft-deletes a report. Optimistic: removes from the local list
-  /// immediately, then asks the server to set deletedAt. If the server
-  /// call fails the local copy is restored so the worker isn't lied to.
-  /// Returns the removed report map (for undo) or null on failure.
+  /// Soft-deletes a report.
   ///
-  /// Three id states are handled:
-  ///   - `synced == false` or non-Mongo id with synced != true:
-  ///       genuinely local-only — local removal IS the whole job.
-  ///   - synced == true AND id is a valid Mongo ObjectId:
-  ///       fast path. PATCH the server, done.
-  ///   - synced == true BUT id is still a stale placeholder
-  ///     (e.g. uploaded before the id-swap fix landed in 51ff9d6):
-  ///       force a syncFromServer to refresh the id, then retry by
-  ///       matching the snapshot against the refreshed list by content.
-  ///       Without this recovery the worker would delete it locally,
-  ///       refresh, and see it come right back (pilot complaint).
+  /// **Strict mode** (per pilot feedback): we DO optimistically remove
+  /// locally for snappy UI, but we always wait for the server's
+  /// confirmation. If the server doesn't confirm (timeout, 5xx, can't
+  /// locate the doc by content match), the local row is RESTORED and
+  /// the caller gets `null` so the UI can surface a clear error. No
+  /// "phantom deleted" rows that never make it to the server's
+  /// `deletedAt` flag (which used to leave admin's Deleted Reports
+  /// panel empty even when workers thought they'd deleted things).
+  ///
+  /// Three id states:
+  ///   - `synced != true` AND non-Mongo id: genuinely local-only,
+  ///     never reached the server — local removal IS the whole job
+  ///     and we return success immediately.
+  ///   - `synced == true` AND valid Mongo ObjectId: fast path, single
+  ///     DELETE call.
+  ///   - `synced == true` BUT stale placeholder id (uploaded before
+  ///     the id-swap fix landed in 51ff9d6): force a syncFromServer,
+  ///     find the server doc by content (caseType + situation + ±5
+  ///     min createdAt), then DELETE with the real _id.
   Future<Map<String, dynamic>?> deleteReport(String reportId) async {
     final idx = reports.indexWhere((r) => r['id'] == reportId);
     if (idx == -1) return null;
@@ -647,36 +557,37 @@ class PatientController extends GetxController {
     reports.refresh();
     await LocalStorageService.saveReports(reports.toList());
 
+    // Restore helper — used by every failure path so we never leave a
+    // ghost-removed row that the server still has.
+    Future<void> restore() async {
+      reports.insert(idx.clamp(0, reports.length), snapshot);
+      reports.refresh();
+      await LocalStorageService.saveReports(reports.toList());
+    }
+
     bool isMongoId(String id) =>
         RegExp(r'^[0-9a-fA-F]{24}$').hasMatch(id);
 
     // ── Genuinely local-only (never synced) ──
-    // Local removal is the whole job — BUT also queue the snapshot so
-    // that if an upload was already in flight (race window between
-    // saveReport and _uploadReport completing), the next sync's drain
-    // can match the just-created server doc and soft-delete it too.
-    // Without this queue, the report reappears on the next sync.
     if (snapshot['synced'] != true && !isMongoId(reportId)) {
-      _pendingReportDeletes.add(snapshot);
       return snapshot;
     }
 
-    // ── Stale-id synced state (uploaded before id-swap fix) ──
-    // Local says synced but the id we have is a placeholder. The server
-    // has the same row under a real Mongo _id. Force a sync to refresh
-    // the local id, then re-locate the report by content match.
-    //
-    // Important: we CANNOT match on createdAt equality. Mongoose's
-    // timestamps:true autosets createdAt to its own clock when the doc
-    // is inserted, ignoring any client-supplied value. So server's
-    // createdAt differs from the local one by hundreds of ms (network
-    // round-trip). The match below is tolerant — same caseType + same
-    // situation + closest createdAt within a 5-minute window.
+    // ── Stale-id synced state ──
+    // Local has synced=true but a placeholder id. Sync first to refresh
+    // the id, then locate the server doc by content. If the sync fails
+    // or the content match fails, restore the row + return null so the
+    // UI shows a clear error — no silent "succeeded" lies.
     String effectiveId = reportId;
     if (snapshot['synced'] == true && !isMongoId(reportId)) {
       try {
         await syncFromServer();
-      } catch (_) { /* offline — fall through */ }
+      } catch (e) {
+        // ignore: avoid_print
+        print('[deleteReport] sync failed: $e — restoring');
+        await restore();
+        return null;
+      }
 
       final snapCreated = DateTime.tryParse(
         snapshot['createdAt']?.toString() ?? '',
@@ -685,8 +596,6 @@ class PatientController extends GetxController {
       final snapCaseType  = snapshot['caseType']?.toString() ?? '';
       final snapBand      = snapshot['finalBand']?.toString() ?? '';
 
-      // Score every Mongo-id report in the freshly synced list. Lower
-      // score = closer match. Pick the closest one inside 5 min.
       Map<String, dynamic>? bestMatch;
       int bestScore = 1 << 30;
       for (final r in reports) {
@@ -694,7 +603,6 @@ class PatientController extends GetxController {
         if (!isMongoId(id)) continue;
         if (r['caseType']?.toString() != snapCaseType) continue;
         if ((r['situation']?.toString().trim() ?? '') != snapSituation) continue;
-        // Optional band check — protects against duplicate situations.
         if (snapBand.isNotEmpty &&
             (r['finalBand']?.toString() ?? '') != snapBand) {
           continue;
@@ -708,21 +616,21 @@ class PatientController extends GetxController {
           bestMatch = r;
         }
       }
-      // 5 min tolerance covers cold-start delays + clock skew.
       if (bestMatch != null && bestScore <= 5 * 60 * 1000) {
         effectiveId = bestMatch['id'] as String;
+        // Remove the resurrected copy locally — we're about to DELETE
+        // it server-side. If the DELETE fails we'll restore from the
+        // snapshot at the original position.
         reports.removeWhere((r) => r['id'] == effectiveId);
         reports.refresh();
         await LocalStorageService.saveReports(reports.toList());
       } else {
-        // No reasonable match found this turn — queue so the NEXT sync
-        // can retry once Render is warm or the server doc shows up.
-        // Without this, a stale-id report sometimes silently "succeeds"
-        // locally but the server still has it → reappears on relogin.
+        // Server doesn't have a matching doc — server lost it OR the
+        // content drifted. Either way, can't confirm a real delete.
         // ignore: avoid_print
-        print('[deleteReport] no server match yet, queueing for retry: $reportId');
-        _pendingReportDeletes.add(snapshot);
-        return snapshot;
+        print('[deleteReport] no server match for $reportId — restoring');
+        await restore();
+        return null;
       }
     }
 
@@ -730,21 +638,16 @@ class PatientController extends GetxController {
     try {
       ok = await ApiService.deleteReport(effectiveId);
     } on UnauthorizedException {
-      reports.insert(idx.clamp(0, reports.length), snapshot);
-      reports.refresh();
-      await LocalStorageService.saveReports(reports.toList());
+      await restore();
       rethrow;
     }
     if (!ok) {
-      // Server call failed (timeout / cold-start / 5xx). Don't roll back
-      // the UI — the worker tapped delete, optimistically respect their
-      // intent. Queue for retry on next sync so the server row eventually
-      // gets soft-deleted too.
+      // Server didn't confirm (timeout / cold-start / 5xx) — restore
+      // and let the UI surface a "delete failed" message.
       // ignore: avoid_print
-      print('[deleteReport] server failed for $effectiveId, queueing for retry');
-      final snapshotWithId = {...snapshot, 'id': effectiveId};
-      _pendingReportDeletes.add(snapshotWithId);
-      return snapshot;
+      print('[deleteReport] server didn\'t confirm $effectiveId — restoring');
+      await restore();
+      return null;
     }
     return snapshot;
   }

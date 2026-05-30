@@ -340,10 +340,15 @@ class ApiService {
   /// it from their view. Returns true on success.
   static Future<bool> deleteReport(String reportId) async {
     try {
+      // 45-sec timeout covers Render free-tier cold-start. Without
+      // UptimeRobot keep-warm the first request after idle can take
+      // 30-50 sec; a 30-sec timeout used to fire spuriously and the
+      // strict-delete UI would surface as "server failed" on what was
+      // actually just a wake-up.
       final res = await http.delete(
         Uri.parse('$baseUrl/reports/$reportId'),
         headers: _headers,
-      ).timeout(const Duration(seconds: 30));
+      ).timeout(const Duration(seconds: 45));
       _guard(res.statusCode);
       if (res.statusCode != 200) {
         // ignore: avoid_print
