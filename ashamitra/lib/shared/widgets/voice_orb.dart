@@ -153,7 +153,25 @@ class _VoiceOrbState extends State<VoiceOrb> with TickerProviderStateMixin {
                       ),
                     ],
                   ),
-                  child: Icon(_orbIcon, color: Colors.white, size: s * 0.30),
+                  // Idle = show the AshaMitra brand mark so the worker
+                  // sees the app's own symbol at rest. Listening /
+                  // processing keep their dynamic state icons (waveform
+                  // / thinking) since those communicate what's happening.
+                  child: Center(
+                    child: widget.state == OrbState.idle
+                        ? ClipOval(
+                            child: Padding(
+                              padding: EdgeInsets.all(s * 0.08),
+                              child: Image.asset(
+                                'assets/images/ashalogo.png',
+                                fit: BoxFit.contain,
+                                color: Colors.white,
+                                colorBlendMode: BlendMode.srcIn,
+                              ),
+                            ),
+                          )
+                        : Icon(_orbIcon, color: Colors.white, size: s * 0.30),
+                  ),
                 ),
               ),
             ],

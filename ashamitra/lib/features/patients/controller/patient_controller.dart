@@ -575,9 +575,13 @@ class PatientController extends GetxController {
 
     // ── Stale-id synced state ──
     // Local has synced=true but a placeholder id. Sync first to refresh
-    // the id, then locate the server doc by content. If the sync fails
-    // or the content match fails, restore the row + return null so the
-    // UI shows a clear error — no silent "succeeded" lies.
+    // the id, then locate the server doc by content. Important: once we
+    // call syncFromServer the local `reports` list is REPLACED with the
+    // authoritative server list (so the stale-id row we tried to remove
+    // gets replaced by the server's version with a real _id). We must
+    // NOT restore from snapshot after sync — the row is conceptually
+    // still there, just under a different id. Restoring would add it
+    // back on top, which is the 18→19 count bug pilot users hit.
     String effectiveId = reportId;
     if (snapshot['synced'] == true && !isMongoId(reportId)) {
       try {
@@ -586,6 +590,8 @@ class PatientController extends GetxController {
         // ignore: avoid_print
         print('[deleteReport] sync failed: $e — restoring');
         await restore();
+        _lastDeleteFailureStatus = 0;
+        _lastDeleteFailureReason = 'sync failed: $e';
         return null;
       }
 
@@ -626,10 +632,13 @@ class PatientController extends GetxController {
         await LocalStorageService.saveReports(reports.toList());
       } else {
         // Server doesn't have a matching doc — server lost it OR the
-        // content drifted. Either way, can't confirm a real delete.
+        // content drifted. Do NOT restore from snapshot (the sync
+        // already wrote the authoritative list; restoring would double
+        // the row, the 18→19 bug). Just surface the failure.
         // ignore: avoid_print
-        print('[deleteReport] no server match for $reportId — restoring');
-        await restore();
+        print('[deleteReport] no server match for $reportId after sync, NOT restoring (list is server-truth)');
+        _lastDeleteFailureStatus = 404;
+        _lastDeleteFailureReason = 'no server match';
         return null;
       }
     }
