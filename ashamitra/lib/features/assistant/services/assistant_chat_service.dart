@@ -175,9 +175,6 @@ class AssistantChatService {
         .replaceAll('```', '')
         .trim();
 
-    // Decode prefetched MP3 (only present from /chat-with-voice). If the
-    // legacy path or a TTS-synthesis failure leaves it null, the screen
-    // falls back to a second /api/tts call via _tts.speak.
     List<int>? audioBytes;
     final audioB64 = body['audio'] as String?;
     if (audioB64 != null && audioB64.isNotEmpty) {
@@ -186,26 +183,64 @@ class AssistantChatService {
       } catch (_) { /* fall back to /tts */ }
     }
 
-    try {
-      final j = jsonDecode(raw) as Map<String, dynamic>;
-      return AssistantResponse(
-        text: (j['spoken_text'] as String? ?? '').trim(),
-        detectedLanguage: _parseLang(j['detected_language']?.toString() ?? appLanguage.code),
-        isClinical: (j['is_clinical'] as bool?) ?? false,
-        shouldOfferSave: (j['should_offer_save'] as bool?) ?? false,
-        prefetchedAudio: audioBytes,
-      );
-    } catch (_) {
-      // LLM returned plain text, not JSON — still useful. Use raw as the
-      // spoken text and assume non-clinical.
-      return AssistantResponse(
-        text: raw.isEmpty ? _genericReply(appLanguage) : raw,
-        detectedLanguage: _heuristicLang(userInput, appLanguage),
-        isClinical: false,
-        shouldOfferSave: false,
-        prefetchedAudio: audioBytes,
-      );
+    // Robust JSON extraction. The LLM sometimes returns prose + a JSON
+    // block (especially Groq for short conversational prompts), e.g.
+    //   "Sure, here's how:\n{\"spoken_text\":\"...\",...}"
+    // jsonDecode(raw) fails in that case, and the old catch branch
+    // rendered the whole blob — JSON included — as the chat message.
+    // Now we scan for the first balanced {...} substring and parse
+    // that; if no JSON is present at all we fall through to the
+    // plain-text path (and strip any leftover JSON-looking tail).
+    final jsonStr = _extractJsonObject(raw);
+    if (jsonStr != null) {
+      try {
+        final j = jsonDecode(jsonStr) as Map<String, dynamic>;
+        final spoken = (j['spoken_text'] as String? ?? '').trim();
+        if (spoken.isNotEmpty) {
+          return AssistantResponse(
+            text: spoken,
+            detectedLanguage: _parseLang(
+                j['detected_language']?.toString() ?? appLanguage.code),
+            isClinical: (j['is_clinical'] as bool?) ?? false,
+            shouldOfferSave: (j['should_offer_save'] as bool?) ?? false,
+            prefetchedAudio: audioBytes,
+          );
+        }
+      } catch (_) { /* malformed JSON — fall through */ }
     }
+
+    // No usable JSON — strip any trailing {...} from the prose so the
+    // chat bubble never shows raw structured fields. If the whole reply
+    // was prose, this is a no-op.
+    final plainText = raw.replaceAll(
+      RegExp(r'\s*\{[\s\S]*\}\s*$', multiLine: true), '',
+    ).trim();
+    return AssistantResponse(
+      text: plainText.isEmpty ? _genericReply(appLanguage) : plainText,
+      detectedLanguage: _heuristicLang(userInput, appLanguage),
+      isClinical: false,
+      shouldOfferSave: false,
+      prefetchedAudio: audioBytes,
+    );
+  }
+
+  /// Scans [raw] for the first balanced JSON object {...} and returns
+  /// it as a substring, or null if no balanced object is found.
+  /// Naive brace counter — good enough since our schema has no
+  /// nested braces inside strings.
+  String? _extractJsonObject(String raw) {
+    final start = raw.indexOf('{');
+    if (start < 0) return null;
+    int depth = 0;
+    for (var i = start; i < raw.length; i++) {
+      final c = raw[i];
+      if (c == '{') depth++;
+      else if (c == '}') {
+        depth--;
+        if (depth == 0) return raw.substring(start, i + 1);
+      }
+    }
+    return null;
   }
 
   // ── Prompt construction ──────────────────────────────────────────────────
@@ -286,13 +321,25 @@ $historyText
 
 ASHA এইমাত্র বললেন: "$userInput"
 
-শুধুমাত্র এই JSON দিয়ে উত্তর দাও (markdown ছাড়া):
+তোমার সম্পূর্ণ উত্তর হবে শুধুমাত্র নিচের JSON অবজেক্ট — অন্য কিছু নয়।
+JSON-এর আগে বা পরে কোনো বাক্য, কোনো প্রস্তাবনা, কোনো ```json``` ফেন্স লিখবে না।
+JSON খোলা ব্রেস `{` দিয়ে শুরু হবে, বন্ধ ব্রেস `}` দিয়ে শেষ হবে।
+তোমার আসল উত্তরটি (যা ASHA শুনবে) "spoken_text" ফিল্ডের ভিতরে যাবে।
+
 {
   "spoken_text": "১-৩ বাক্যের প্রাকৃতিক উত্তর — ASHA-র ভাষায়",
   "detected_language": "bn|hi|en",
   "is_clinical": false,
   "should_offer_save": false
 }
+
+❌ ভুল (এটা করবে না):
+   আরে দিদি, চা বানানোর জন্য পানি ফুটতে দিন।
+   {"spoken_text": "...", ...}
+   ← JSON-এর আগে বাক্য লিখো না!
+
+✅ সঠিক:
+   {"spoken_text": "আরে দিদি, চা বানানোর জন্য পানি ফুটতে দিন।", "detected_language": "bn", "is_clinical": false, "should_offer_save": false}
 ''';
   }
 
